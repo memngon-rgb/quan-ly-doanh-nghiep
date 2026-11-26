@@ -5,6 +5,13 @@ import { isDemo } from '../../core/supabase'
 import { listUsers, saveBranch, updateUser, type UserRow } from '../../core/api'
 import { ROLE_LABEL, type Role } from '../../core/types'
 
+const STORE_PERMS = [
+  { code: 'store.shift', label: 'Báo cáo ca' },
+  { code: 'store.review', label: 'Đánh giá food app' },
+  { code: 'store.revenue', label: 'Số thực nhận' },
+  { code: 'store.utility', label: 'Điện nước' },
+]
+
 export default function Users() {
   const { branches, reloadBranches } = useAuth()
   const toast = useToast()
@@ -97,12 +104,13 @@ function UserForm({ user, onClose, onSaved }: { user: UserRow; onClose: () => vo
   const [role, setRole] = useState<Role>(user.role)
   const [active, setActive] = useState(user.is_active)
   const [bids, setBids] = useState<string[]>(user.branch_ids)
+  const [perms, setPerms] = useState<string[]>(user.extra_perms)
   const [busy, setBusy] = useState(false)
   const self = access?.profile.id === user.id
 
   async function save() {
     setBusy(true)
-    try { await updateUser(user.id, { full_name: name.trim(), role, is_active: active }, bids); toast('Đã lưu'); onSaved() } catch (e) { toast(errText(e), true) } finally { setBusy(false) }
+    try { await updateUser(user.id, { full_name: name.trim(), role, is_active: active }, bids, perms); toast('Đã lưu'); onSaved() } catch (e) { toast(errText(e), true) } finally { setBusy(false) }
   }
 
   return (
@@ -121,6 +129,16 @@ function UserForm({ user, onClose, onSaved }: { user: UserRow; onClose: () => vo
             })}
           </div>
           {role === 'owner' && <span className="mem-caption">Chủ luôn xem được tất cả chi nhánh.</span>}</div>
+        {role !== 'owner' && (
+          <div className="field"><span className="lbl">Quyền mục “Báo cáo cửa hàng”</span>
+            <div className="chip-row">
+              {STORE_PERMS.map((p) => {
+                const on = perms.includes(p.code)
+                return <button key={p.code} type="button" className={`chip ${on ? 'on' : ''}`} aria-pressed={on} onClick={() => setPerms(on ? perms.filter((x) => x !== p.code) : [...perms, p.code])}>{p.label}</button>
+              })}
+            </div>
+            <span className="mem-caption">Chọn đúng những tab người này được dùng. Quản lý mặc định có đủ, bạn có thể bổ sung thêm cho Nhân viên (MOD). Chủ luôn có đủ.</span></div>
+        )}
         <label className="row" style={{ cursor: self ? 'not-allowed' : 'pointer' }}><input type="checkbox" checked={active} disabled={self} onChange={(e) => setActive(e.target.checked)} /> Cho phép đăng nhập</label>
         <div className="row" style={{ justifyContent: 'flex-end' }}>
           <button className="mem-btn" onClick={onClose}>Hủy</button>

@@ -21,7 +21,7 @@ Mở địa chỉ hiện ra (thường là http://localhost:5173).
 ## 2. Kết nối Supabase (dữ liệu thật)
 
 1. Vào https://supabase.com, tạo tài khoản và **New project** (chọn vùng Singapore cho nhanh).
-2. Vào **SQL Editor**, mở lần lượt từng file trong `supabase/migrations/` theo thứ tự số (`0001_core.sql`, `0002_finance.sql`, rồi `0003_grants.sql`), dán nội dung và bấm **Run**.
+2. Vào **SQL Editor**, mở lần lượt từng file trong `supabase/migrations/` theo thứ tự số (`0001_core.sql`, `0002_finance.sql`, `0003_grants.sql`, `0004_fix_import_key.sql`, rồi `0005_payments.sql`, `0006_sales_vat.sql`, rồi `0007_sales_detail.sql`, rồi `0008_reconcile.sql`, `0009_store_reports.sql`), dán nội dung và bấm **Run**.
 3. Vào **Authentication → Providers → Email**: tắt **Allow new users to sign up** để người lạ không tự đăng ký.
 4. Vào **Authentication → Users → Add user**, tạo tài khoản đầu tiên của bạn. **Tài khoản đầu tiên tự thành Chủ.** Các tài khoản sau là Nhân viên, bạn vào mục Quản trị → Người dùng của web để gán vai trò và chi nhánh.
 5. Vào **Project Settings → API**, chép `Project URL` và khóa `anon public`.
@@ -62,7 +62,8 @@ Hoặc làm tay: chạy `npm run build`, rồi tải nội dung thư mục `dist
 |---|---|
 | Tổng quan | Doanh thu, chi, lãi gộp, dòng tiền, cảnh báo |
 | Thu chi | Kế toán nhập thu chi hằng ngày, đính kèm ảnh chứng từ |
-| Nhập file | Tải báo cáo thu chi tiền mặt, báo cáo doanh thu ngày (iPOS) từ Excel/CSV. Nhập lại file không bị trùng |
+| Thu chi → nút **Nhập file** | Tải báo cáo thu chi tiền mặt (iPOS D03) ngay trong trang Thu chi |
+| Doanh thu → nút **Nhập file doanh thu** | Tải báo cáo iPOS A02 (nhiều cửa hàng) hoặc file doanh thu khác. Nhập lại file không bị trùng |
 | Dự tính | “Bán 10 triệu/ngày thì chi phí bao nhiêu, đủ chi trả không?”, chỉnh số dự tính |
 | P&L | Báo cáo lãi lỗ, thực tế so với dự tính, xuất Excel |
 | Danh mục | Thêm danh mục thu chi và chọn nhóm (giá vốn, lương, cố định, khác) |
@@ -82,7 +83,7 @@ src/modules/hr/         ← ví dụ Nhân sự: bảng hr_*, quyền hr.*
 
 Các bước thêm một hạng mục (ví dụ Kho):
 
-1. Tạo `supabase/migrations/0003_inventory.sql`: bảng `inv_*`, quyền `inventory.*`, luật RLS. **Không sửa các file migration cũ.**
+1. Tạo `supabase/migrations/0010_inventory.sql`: bảng `inv_*`, quyền `inventory.*`, luật RLS. **Không sửa các file migration cũ.**
 2. Tạo thư mục `src/modules/inventory/` và export một `AppModule` (xem `src/modules/finance/index.tsx`).
 3. Thêm 1 dòng vào `src/modules/registry.ts`.
 

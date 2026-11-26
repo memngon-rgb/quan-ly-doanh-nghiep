@@ -2,10 +2,12 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { useAuth } from '../../core/auth'
 import { compressImage } from '../../core/image'
 import { exportXlsx } from '../../core/excel'
-import { money, monthLabel, monthRange, num, shiftMonth, thisMonth, today, vnDate } from '../../core/format'
+import { money, num, today, vnDate } from '../../core/format'
+import { DateRangePicker, useDateRange } from '../../core/DateRange'
 import { Empty, ErrorBox, Loading, Modal, MoneyInput, PageHead, errText, useAsync, useToast } from '../../core/ui'
-import { IconDownload, IconPlus } from '../../core/icons'
+import { IconDownload, IconPlus, IconUpload } from '../../core/icons'
 import { addTx, deleteTx, listCategories, listTx, receiptUrl, updateTx, uploadReceipt } from './api'
+import ImportPanel from './Import'
 import { METHOD_LABEL, type Category, type Method, type Tx, type TxType } from './types'
 
 const PAGE = 150
@@ -13,16 +15,16 @@ const PAGE = 150
 export default function Ledger() {
   const { branchId, branches, can } = useAuth()
   const toast = useToast()
-  const [month, setMonth] = useState(thisMonth())
+  const [range, setRange] = useDateRange()
   const [type, setType] = useState<'' | TxType>('')
   const [catId, setCatId] = useState('')
   const [q, setQ] = useState('')
   const [limit, setLimit] = useState(PAGE)
   const [editing, setEditing] = useState<Tx | 'new' | null>(null)
+  const [importing, setImporting] = useState(false)
 
-  const r = monthRange(month)
   const cats = useAsync(listCategories, [])
-  const tx = useAsync(() => listTx(branchId, r.from, r.to), [branchId, month])
+  const tx = useAsync(() => listTx(branchId, range.from, range.to), [branchId, range.from, range.to])
 
   const catName = useMemo(() => new Map((cats.data ?? []).map((c) => [c.id, c.name])), [cats.data])
   const branchName = useMemo(() => new Map(branches.map((b) => [b.id, b.name])), [branches])
@@ -65,7 +67,7 @@ export default function Ledger() {
 
   async function exportFile() {
     await exportXlsx(
-      `so-thu-chi-${month}`,
+      `so-thu-chi-${range.from}_${range.to}`,
       ['Ngày', 'Chi nhánh', 'Loại', 'Danh mục', 'Hình thức', 'Số tiền', 'Ghi chú'],
       rows.map((t) => [
         vnDate(t.tx_date), branchName.get(t.branch_id) ?? '', t.type === 'income' ? 'Thu' : 'Chi',
@@ -83,6 +85,7 @@ export default function Ledger() {
         right={
           <>
             <button className="mem-btn" onClick={() => void exportFile()} disabled={!rows.length}><IconDownload /> Xuất Excel</button>
+            {can('finance.import') && <button className="mem-btn" onClick={() => setImporting(true)}><IconUpload /> Nhập file</button>}
             {can('finance.write') && <button className="mem-btn mem-btn-primary" onClick={() => setEditing('new')}><IconPlus /> Thêm khoản</button>}
           </>
         }
@@ -90,9 +93,7 @@ export default function Ledger() {
 
       <div className="mem-card stack">
         <div className="row">
-          <button className="mem-btn mem-btn-sm" onClick={() => setMonth(shiftMonth(month, -1))} aria-label="Tháng trước">‹</button>
-          <b style={{ minWidth: 110, textAlign: 'center' }}>{monthLabel(month)}</b>
-          <button className="mem-btn mem-btn-sm" onClick={() => setMonth(shiftMonth(month, 1))} aria-label="Tháng sau">›</button>
+          <DateRangePicker value={range} onChange={setRange} />
           <select className="input" style={{ width: 'auto' }} value={type} onChange={(e) => setType(e.target.value as '' | TxType)} aria-label="Lọc loại">
             <option value="">Thu và chi</option><option value="income">Chỉ thu</option><option value="expense">Chỉ chi</option>
           </select>
@@ -110,7 +111,7 @@ export default function Ledger() {
         </div>
 
         {tx.loading || cats.loading ? <Loading /> : tx.error || cats.error ? <ErrorBox error={tx.error ?? cats.error} retry={() => { tx.reload(); cats.reload() }} /> : rows.length === 0 ? (
-          <Empty title="Chưa có khoản nào" hint="Bấm “Thêm khoản” để nhập thu chi, hoặc dùng mục “Nhập file” để tải báo cáo từ Excel." />
+          <Empty title="Chưa có khoản nào" hint="Bấm “Thêm khoản” để nhập thu chi, hoặc “Nhập file” để tải báo cáo thu chi từ iPOS (D03)." />
         ) : (
           <>
             <div className="table-wrap">
@@ -146,6 +147,12 @@ export default function Ledger() {
           </>
         )}
       </div>
+
+      {importing && (
+        <Modal title="Nhập file thu chi tiền mặt" onClose={() => setImporting(false)} wide>
+          <ImportPanel mode="tx" onDone={() => tx.reload()} />
+        </Modal>
+      )}
 
       {editing && (
         <TxForm

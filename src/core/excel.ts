@@ -1,4 +1,4 @@
-import readXlsxFile from 'read-excel-file'
+import readXlsxFile, { readSheetNames } from 'read-excel-file'
 import writeXlsxFile from 'write-excel-file'
 import { safeCell } from './format'
 
@@ -14,6 +14,15 @@ export async function readTable(file: File): Promise<Cell[][]> {
     return parseCsv(await file.text())
   }
   throw new Error('Chỉ hỗ trợ file .xlsx hoặc .csv. Nếu file là .xls, hãy mở bằng Excel và Lưu thành .xlsx.')
+}
+
+/** Đọc mọi sheet của file .xlsx (báo cáo iPOS nhiều cửa hàng: mỗi cửa hàng một sheet) */
+export async function readSheets(file: File): Promise<{ name: string; rows: Cell[][] }[]> {
+  if (!file.name.toLowerCase().endsWith('.xlsx')) throw new Error('Báo cáo này phải là file .xlsx.')
+  const names = await readSheetNames(file)
+  const out: { name: string; rows: Cell[][] }[] = []
+  for (const name of names) out.push({ name, rows: (await readXlsxFile(file, { sheet: name })) as Cell[][] })
+  return out
 }
 
 export function parseCsv(text: string): Cell[][] {

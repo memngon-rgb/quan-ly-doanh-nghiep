@@ -6,6 +6,7 @@ export const EXPENSE_GROUPS: Group[] = ['cogs', 'payroll', 'fixed', 'other']
 export interface Summary {
   revenue: number
   revenueFromSales: boolean
+  vat: number
   income: number
   expense: number
   byGroup: Record<Group, number>
@@ -39,9 +40,11 @@ export function summarize(txs: Tx[], sales: Sale[], cats: Category[]): Summary {
   }
   const salesSum = sales.reduce((s, x) => s + x.revenue, 0)
   const revenueFromSales = salesSum > 0
+  const vat = sales.reduce((s, x) => s + (x.vat ?? 0), 0)
   return {
     revenue: revenueFromSales ? salesSum : incomeRevenue,
     revenueFromSales,
+    vat,
     income,
     expense,
     byGroup,
@@ -139,4 +142,48 @@ export function simulate(dailyRevenue: number, cogsPct: number, monthlyFixed: nu
     breakeven: cogsPct < 1 ? fixedDaily / (1 - cogsPct) : Infinity,
     ok: profit >= 0,
   }
+}
+
+/** Các tháng (yyyy-mm) mà khoảng ngày [from, to] chạm tới. */
+export function monthsIn(from: string, to: string): string[] {
+  const out: string[] = []
+  for (let m = from.slice(0, 7); m <= to.slice(0, 7); m = shiftMonth(m, 1)) out.push(m)
+  return out
+}
+
+export interface RangePlan {
+  revenue: number
+  fixed: number
+  cogsPct: number
+  /** Dự tính theo danh mục chi (đã quy theo số ngày của khoảng) */
+  byCategory: Record<string, number>
+  byGroup: Record<Group, number>
+  /** Dự tính của tháng cuối khoảng, dùng cho các cảnh báo */
+  last: Forecast
+}
+
+/** Dự tính cho 1 khoảng ngày bất kỳ: lấy dự tính từng tháng rồi quy theo số ngày của khoảng nằm trong tháng đó. */
+export function rangePlan(from: string, to: string, tx: Tx[], sales: Sale[], cats: Category[], items: ForecastItem[]): RangePlan {
+  const byCategory: Record<string, number> = {}
+  const byGroup = zeroGroups()
+  let revenue = 0
+  let fixed = 0
+  let cogs = 0
+  let last = buildForecast(to.slice(0, 7), tx, sales, cats, items)
+  for (const m of monthsIn(from, to)) {
+    const f = m === to.slice(0, 7) ? last : buildForecast(m, tx, sales, cats, items)
+    const r = monthRange(m)
+    const a = from > r.from ? from : r.from
+    const b = to < r.to ? to : r.to
+    const share = (Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86_400_000) + 1) / r.days
+    revenue += f.revenueMonthly * share
+    fixed += f.fixedMonthly * share
+    cogs += f.revenueMonthly * f.cogsPct * share
+    for (const l of f.lines) {
+      byCategory[l.cat.id] = (byCategory[l.cat.id] ?? 0) + l.value * share
+      byGroup[l.cat.grp] += l.value * share
+    }
+  }
+  byGroup.cogs = cogs
+  return { revenue, fixed, cogsPct: revenue > 0 ? cogs / revenue : last.cogsPct, byCategory, byGroup, last }
 }

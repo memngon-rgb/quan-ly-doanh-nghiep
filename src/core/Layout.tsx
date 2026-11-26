@@ -1,12 +1,16 @@
+import { useEffect } from 'react'
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from './auth'
 import { IconLogout } from './icons'
 import { isDemo } from './supabase'
+import { fetchCompanyTheme, useTheme } from './theme'
 import { resetDemo } from './demo'
 import { ROLE_LABEL, type AppModule } from './types'
 
 export function Layout({ modules }: { modules: AppModule[] }) {
   const { access, can, signOut, branches, branchId, setBranchId } = useAuth()
+  const theme = useTheme()
+  useEffect(() => { void fetchCompanyTheme().catch(() => undefined) }, [])
   const visible = modules
     .map((m) => ({ ...m, nav: m.nav.filter((n) => can(n.perm)) }))
     .filter((m) => m.nav.length > 0)
@@ -15,10 +19,12 @@ export function Layout({ modules }: { modules: AppModule[] }) {
     <div className="mem-app">
       <nav className="mem-sidebar" aria-label="Điều hướng chính">
         <div className="brand">
-          <div className="brand-logo">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round"><path d="M6 19v-7M12 19V6M18 19v-4" /></svg>
+          <div className="brand-logo" style={theme.logo ? { background: 'none' } : undefined}>
+            {theme.logo
+              ? <img src={theme.logo} alt="" style={{ width: 32, height: 32, objectFit: 'contain', borderRadius: 9 }} />
+              : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round"><path d="M6 19v-7M12 19V6M18 19v-4" /></svg>}
           </div>
-          <span>Quản lý</span>
+          <span>{theme.name}</span>
         </div>
         {visible.map((m) => (
           <div key={m.id} style={{ display: 'contents' }}>

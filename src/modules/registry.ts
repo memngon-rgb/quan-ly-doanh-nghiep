@@ -1,6 +1,7 @@
 import type { AppModule } from '../core/types'
 import { financeModule } from './finance'
 import { adminModule } from './admin'
+import { storeModule } from './store'
 
 /**
  * DANH SÁCH MÔ-ĐUN. Muốn thêm hạng mục mới (Kho, Nhân sự, Đi chợ...):
@@ -9,4 +10,4 @@ import { adminModule } from './admin'
  *   3. Thêm file migration SQL mới trong supabase/migrations/ (bảng tiền tố riêng + quyền riêng)
  * Không phải sửa code của các mô-đun đã có.
  */
-export const modules: AppModule[] = [financeModule, adminModule]
+export const modules: AppModule[] = [financeModule, storeModule, adminModule]

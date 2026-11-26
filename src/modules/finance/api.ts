@@ -1,7 +1,7 @@
 import { isDemo, sb } from '../../core/supabase'
 import { DEMO_BRANCHES, DEMO_USER_ID, loadTable, rng, saveTable, uid } from '../../core/demo'
 import { addDays, today } from '../../core/format'
-import type { Category, ForecastItem, NewTx, Sale, Tx } from './types'
+import { DEDUCTION_CATEGORY, DEDUCTION_LABEL, type Actual, type Category, type Channel, type Deduction, type ForecastItem, type Holiday, type NewTx, type Payment, type Sale, type Tx } from './types'
 
 /** Lấy danh sách chi nhánh cần truy vấn: '' = tất cả (RLS tự lọc theo quyền) */
 const branchFilter = <T extends { eq: (c: string, v: string) => T }>(q: T, branchId: string): T =>
@@ -181,6 +181,92 @@ export async function upsertSales(rows: Sale[]): Promise<number> {
   return rows.length
 }
 
+/** Xóa doanh thu + phương thức thanh toán của 1 chi nhánh trong 1 ngày (để nhập lại cho đúng). */
+export async function deleteSalesDay(branchId: string, date: string): Promise<void> {
+  if (isDemo) {
+    saveTable('fin_daily_sales', demoSales().filter((s) => !(s.branch_id === branchId && s.sale_date === date)))
+    saveTable('fin_daily_payments', loadTable<Payment>('fin_daily_payments', () => []).filter((p) => !(p.branch_id === branchId && p.pay_date === date)))
+    saveTable('fin_daily_channels', loadTable<Channel>('fin_daily_channels', () => []).filter((c) => !(c.branch_id === branchId && c.sale_date === date)))
+    return
+  }
+  const a = await sb().from('fin_daily_sales').delete().eq('branch_id', branchId).eq('sale_date', date)
+  if (a.error) throw a.error
+  const b = await sb().from('fin_daily_payments').delete().eq('branch_id', branchId).eq('pay_date', date)
+  if (b.error) throw b.error
+  const c = await sb().from('fin_daily_channels').delete().eq('branch_id', branchId).eq('sale_date', date)
+  if (c.error) throw c.error
+}
+
+/** Xóa các khoản thu chi do NHẬP FILE tạo (không đụng khoản nhập tay) của 1 chi nhánh trong khoảng ngày, cùng hình thức (tiền mặt hoặc chuyển khoản). */
+export async function deleteImportedTx(branchId: string, from: string, to: string, method: string): Promise<number> {
+  if (isDemo) {
+    const cur = demoTx()
+    const keep = cur.filter((t) => !(t.branch_id === branchId && t.source === 'import' && t.method === method && t.tx_date >= from && t.tx_date <= to))
+    saveTable('fin_transactions', keep)
+    return cur.length - keep.length
+  }
+  const { data, error } = await sb().from('fin_transactions').delete()
+    .eq('branch_id', branchId).eq('source', 'import').eq('method', method).gte('tx_date', from).lte('tx_date', to).select('id')
+  if (error) throw error
+  return data?.length ?? 0
+}
+
+/* ======================= Doanh thu theo nguồn đơn (B03) ======================= */
+export async function listChannels(branchId: string, from: string, to: string): Promise<Channel[]> {
+  if (isDemo) return loadTable<Channel>('fin_daily_channels', () => []).filter((c) => (!branchId || c.branch_id === branchId) && c.sale_date >= from && c.sale_date <= to)
+  const out: Channel[] = []
+  for (let page = 0; ; page++) {
+    const { data, error } = await branchFilter(sb().from('fin_daily_channels').select('*').gte('sale_date', from).lte('sale_date', to), branchId)
+      .order('sale_date').range(page * 1000, page * 1000 + 999)
+    if (error) throw error
+    out.push(...(data as Channel[]))
+    if ((data?.length ?? 0) < 1000) break
+  }
+  return out
+}
+
+export async function upsertChannels(rows: Channel[]): Promise<number> {
+  if (isDemo) {
+    const map = new Map(loadTable<Channel>('fin_daily_channels', () => []).map((c) => [`${c.branch_id}|${c.sale_date}|${c.channel}`, c]))
+    rows.forEach((r) => map.set(`${r.branch_id}|${r.sale_date}|${r.channel}`, r))
+    saveTable('fin_daily_channels', [...map.values()])
+    return rows.length
+  }
+  for (let i = 0; i < rows.length; i += 500) {
+    const { error } = await sb().from('fin_daily_channels').upsert(rows.slice(i, i + 500).map((r) => ({ ...r, source: 'import' })), { onConflict: 'branch_id,sale_date,channel' })
+    if (error) throw error
+  }
+  return rows.length
+}
+
+/* ======================= Doanh thu theo phương thức thanh toán ======================= */
+export async function listPayments(branchId: string, from: string, to: string): Promise<Payment[]> {
+  if (isDemo) return loadTable<Payment>('fin_daily_payments', () => []).filter((p) => (!branchId || p.branch_id === branchId) && p.pay_date >= from && p.pay_date <= to)
+  const out: Payment[] = []
+  for (let page = 0; ; page++) {
+    const { data, error } = await branchFilter(sb().from('fin_daily_payments').select('*').gte('pay_date', from).lte('pay_date', to), branchId)
+      .order('pay_date').range(page * 1000, page * 1000 + 999)
+    if (error) throw error
+    out.push(...(data as Payment[]))
+    if ((data?.length ?? 0) < 1000) break
+  }
+  return out
+}
+
+export async function upsertPayments(rows: Payment[]): Promise<number> {
+  if (isDemo) {
+    const map = new Map(loadTable<Payment>('fin_daily_payments', () => []).map((p) => [`${p.branch_id}|${p.pay_date}|${p.method}`, p]))
+    rows.forEach((r) => map.set(`${r.branch_id}|${r.pay_date}|${r.method}`, r))
+    saveTable('fin_daily_payments', [...map.values()])
+    return rows.length
+  }
+  for (let i = 0; i < rows.length; i += 500) {
+    const { error } = await sb().from('fin_daily_payments').upsert(rows.slice(i, i + 500).map((r) => ({ ...r, source: 'import' })), { onConflict: 'branch_id,pay_date,method' })
+    if (error) throw error
+  }
+  return rows.length
+}
+
 /* ======================= Dự tính ======================= */
 export async function listForecast(branchId: string): Promise<ForecastItem[]> {
   if (isDemo) return loadTable<ForecastItem>('fin_forecast_items', () => []).filter((f) => !branchId || f.branch_id === branchId)
@@ -217,6 +303,133 @@ export async function removeForecast(f: Pick<ForecastItem, 'branch_id' | 'catego
   if (error) throw error
 }
 
+/* ======================= Đối soát: số thực nhận cửa hàng khai ======================= */
+export async function listActuals(branchId: string, from: string, to: string): Promise<Actual[]> {
+  if (isDemo) return loadTable<Actual>('fin_recon_actuals', () => []).filter((a) => (!branchId || a.branch_id === branchId) && a.date_from >= from && a.date_to <= to)
+  const { data, error } = await branchFilter(sb().from('fin_recon_actuals').select('*').gte('date_from', from).lte('date_to', to), branchId)
+    .order('date_from', { ascending: false })
+  if (error) throw error
+  return (data as Actual[]).map((a) => ({ ...a, amount: Number(a.amount), recovery: Number(a.recovery) }))
+}
+
+export async function saveActual(a: Omit<Actual, 'id'> & { id?: string }): Promise<void> {
+  if (isDemo) {
+    const rows = loadTable<Actual>('fin_recon_actuals', () => [])
+    const dup = rows.find((r) => r.id === a.id) ?? rows.find((r) => r.branch_id === a.branch_id && r.source === a.source && r.date_from === a.date_from && r.date_to === a.date_to)
+    if (dup) saveTable('fin_recon_actuals', rows.map((r) => (r.id === dup.id ? { ...r, ...a, id: dup.id } : r)))
+    else saveTable('fin_recon_actuals', [...rows, { ...a, id: uid() }])
+    return
+  }
+  const body = {
+    branch_id: a.branch_id, source: a.source, date_from: a.date_from, date_to: a.date_to, amount: a.amount, photo_path: a.photo_path,
+    explain: a.explain, explain_status: a.explain_status, recovery: a.recovery, recovery_status: a.recovery_status,
+  }
+  const { error } = await sb().from('fin_recon_actuals').upsert(body, { onConflict: 'branch_id,source,date_from,date_to' })
+  if (error) throw error
+}
+
+/** Nhập hàng loạt số thực nhận (ghi đè dòng trùng cửa hàng + nguồn + ngày). */
+export async function saveActuals(rows: Omit<Actual, 'id'>[]): Promise<number> {
+  if (isDemo) {
+    const cur = loadTable<Actual>('fin_recon_actuals', () => [])
+    const key = (a: Omit<Actual, 'id'>) => `${a.branch_id}|${a.source}|${a.date_from}|${a.date_to}`
+    const map = new Map(cur.map((a) => [key(a), a]))
+    rows.forEach((r) => map.set(key(r), { ...r, id: map.get(key(r))?.id ?? uid() }))
+    saveTable('fin_recon_actuals', [...map.values()])
+    return rows.length
+  }
+  for (let i = 0; i < rows.length; i += 500) {
+    const body = rows.slice(i, i + 500).map((a) => ({
+      branch_id: a.branch_id, source: a.source, date_from: a.date_from, date_to: a.date_to, amount: a.amount, photo_path: a.photo_path,
+      explain: a.explain, explain_status: a.explain_status, recovery: a.recovery, recovery_status: a.recovery_status,
+    }))
+    const { error } = await sb().from('fin_recon_actuals').upsert(body, { onConflict: 'branch_id,source,date_from,date_to' })
+    if (error) throw error
+  }
+  return rows.length
+}
+
+export async function deleteActual(id: string): Promise<void> {
+  if (isDemo) return saveTable('fin_recon_actuals', loadTable<Actual>('fin_recon_actuals', () => []).filter((a) => a.id !== id))
+  const { error } = await sb().from('fin_recon_actuals').delete().eq('id', id)
+  if (error) throw error
+}
+
+/* ======================= Đối soát: khoản bị trừ (tự sinh chi phí) ======================= */
+export async function listDeductions(branchId: string, from: string, to: string): Promise<Deduction[]> {
+  if (isDemo) return loadTable<Deduction>('fin_recon_deductions', () => []).filter((d) => (!branchId || d.branch_id === branchId) && d.date_from >= from && d.date_to <= to)
+  const { data, error } = await branchFilter(sb().from('fin_recon_deductions').select('*').gte('date_from', from).lte('date_to', to), branchId)
+    .order('date_from', { ascending: false })
+  if (error) throw error
+  return (data as Deduction[]).map((d) => ({ ...d, amount: Number(d.amount) }))
+}
+
+async function ensureCategoryId(name: string): Promise<string | null> {
+  let cats = await listCategories()
+  let c = cats.find((x) => x.name === name)
+  if (!c) {
+    try { await saveCategory({ name, type: 'expense', grp: 'other' }) } catch { return null }
+    cats = await listCategories()
+    c = cats.find((x) => x.name === name)
+  }
+  return c?.id ?? null
+}
+
+/** Lưu khoản bị trừ và đồng bộ 1 dòng chi phí tương ứng ở Thu chi (khóa recon|<id>, sửa thì cập nhật, không nhân đôi). */
+export async function saveDeduction(d: Omit<Deduction, 'id'> & { id?: string }): Promise<void> {
+  const id = d.id ?? uid()
+  const catId = await ensureCategoryId(DEDUCTION_CATEGORY[d.kind])
+  const tx: NewTx = {
+    branch_id: d.branch_id, tx_date: d.date_to, type: 'expense', category_id: catId, amount: d.amount, method: 'transfer',
+    note: `${DEDUCTION_LABEL[d.kind]}${d.note ? ': ' + d.note : ''} (tự động từ Đối soát)`, receipt_path: null, source: 'manual', external_key: `recon|${id}`,
+  }
+  if (isDemo) {
+    const rows = loadTable<Deduction>('fin_recon_deductions', () => [])
+    const next = { ...d, id }
+    saveTable('fin_recon_deductions', rows.some((r) => r.id === id) ? rows.map((r) => (r.id === id ? next : r)) : [...rows, next])
+    const all = demoTx().filter((t) => !(t.external_key === tx.external_key))
+    saveTable('fin_transactions', [{ ...tx, id: uid(), created_by: DEMO_USER_ID }, ...all])
+    return
+  }
+  const a = await sb().from('fin_recon_deductions').upsert({ id, branch_id: d.branch_id, date_from: d.date_from, date_to: d.date_to, kind: d.kind, source: d.source, amount: d.amount, note: d.note })
+  if (a.error) throw a.error
+  const b = await sb().from('fin_transactions').upsert(tx, { onConflict: 'branch_id,external_key' })
+  if (b.error) throw b.error
+}
+
+export async function deleteDeduction(d: Deduction): Promise<void> {
+  if (isDemo) {
+    saveTable('fin_recon_deductions', loadTable<Deduction>('fin_recon_deductions', () => []).filter((r) => r.id !== d.id))
+    saveTable('fin_transactions', demoTx().filter((t) => t.external_key !== `recon|${d.id}`))
+    return
+  }
+  const a = await sb().from('fin_transactions').delete().eq('branch_id', d.branch_id).eq('external_key', `recon|${d.id}`)
+  if (a.error) throw a.error
+  const b = await sb().from('fin_recon_deductions').delete().eq('id', d.id)
+  if (b.error) throw b.error
+}
+
+/* ======================= Ngày nghỉ lễ ======================= */
+export async function listHolidays(): Promise<Holiday[]> {
+  if (isDemo) return loadTable<Holiday>('fin_holidays', () => [])
+  const { data, error } = await sb().from('fin_holidays').select('*').order('hdate', { ascending: false })
+  if (error) throw error
+  return data as Holiday[]
+}
+export async function saveHoliday(h: Holiday): Promise<void> {
+  if (isDemo) {
+    const rows = loadTable<Holiday>('fin_holidays', () => []).filter((r) => !(r.hdate === h.hdate && r.platform === h.platform))
+    return saveTable('fin_holidays', [...rows, h])
+  }
+  const { error } = await sb().from('fin_holidays').upsert(h, { onConflict: 'hdate,platform' })
+  if (error) throw error
+}
+export async function deleteHoliday(h: Holiday): Promise<void> {
+  if (isDemo) return saveTable('fin_holidays', loadTable<Holiday>('fin_holidays', () => []).filter((r) => !(r.hdate === h.hdate && r.platform === h.platform)))
+  const { error } = await sb().from('fin_holidays').delete().eq('hdate', h.hdate).eq('platform', h.platform)
+  if (error) throw error
+}
+
 /* ======================= Ảnh chứng từ ======================= */
 export async function uploadReceipt(branchId: string, blob: Blob): Promise<string | null> {
   if (isDemo) return null
@@ -237,5 +450,7 @@ export async function backupAll(): Promise<Record<string, unknown[]>> {
   const from = '2000-01-01'
   const to = '2999-12-31'
   const [cats, tx, sales, fc] = await Promise.all([listCategories(), listTx('', from, to), listSales('', from, to), listForecast('')])
-  return { fin_categories: cats, fin_transactions: tx, fin_daily_sales: sales, fin_forecast_items: fc }
+  const [pays, chans] = await Promise.all([listPayments('', from, to), listChannels('', from, to)])
+  const [acts, deds] = await Promise.all([listActuals('', from, to), listDeductions('', from, to)])
+  return { fin_categories: cats, fin_transactions: tx, fin_daily_sales: sales, fin_forecast_items: fc, fin_daily_payments: pays, fin_daily_channels: chans, fin_recon_actuals: acts, fin_recon_deductions: deds }
 }

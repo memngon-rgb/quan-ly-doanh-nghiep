@@ -94,7 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       branches,
       branchId: valid ? branchId : '',
       setBranchId,
-      can: (p: string) => !!access && (access.perms.includes('*') || access.perms.includes(p)),
+      can: (p: string) => !!access && (access.perms.includes('*') || p.split('|').some((x) => access.perms.includes(x))),
       signOut: async () => {
         if (isDemo) return
         await supabase!.auth.signOut()
