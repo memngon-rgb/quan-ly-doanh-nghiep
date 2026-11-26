@@ -13,6 +13,8 @@ export const IconUsers = () => I(<><circle cx="9" cy="8" r="3.5" /><path d="M2.5
 export const IconDownload = () => I(<><path d="M12 4v12" /><path d="M7 11l5 5 5-5" /><path d="M5 20h14" /></>)
 export const IconPlus = () => I(<><path d="M12 5v14M5 12h14" /></>)
 export const IconLogout = () => I(<><path d="M9 4H5a1 1 0 00-1 1v14a1 1 0 001 1h4" /><path d="M16 8l4 4-4 4M20 12H9" /></>)
+export const IconReceipt = () => I(<><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z" /><path d="M9 8h6M9 12h6" /></>)
+export const IconBriefcase = () => I(<><rect x="3" y="7" width="18" height="13" rx="2" /><path d="M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2M3 13h18" /></>)
 export const IconWallet = () => I(<><path d="M3 7a2 2 0 012-2h13v4" /><rect x="3" y="7" width="18" height="13" rx="2" /><circle cx="16.5" cy="13.5" r="1" /></>)
 export const IconTrend = () => I(<><path d="M3 17l6-6 4 4 8-8" /><path d="M15 7h6v6" /></>)
 export const IconAlert = () => I(<><path d="M12 3l10 18H2z" /><path d="M12 10v5M12 18h.01" /></>)

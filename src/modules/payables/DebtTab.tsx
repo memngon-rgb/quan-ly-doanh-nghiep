@@ -4,7 +4,7 @@ import { money, num, today, vnDate } from '../../core/format'
 import { IconDownload, IconPlus, IconUpload } from '../../core/icons'
 import { Empty, Modal, MoneyInput, errText, useToast } from '../../core/ui'
 import { addOrders, deleteOrder, markPaid, updateOrder } from './api'
-import { ageDays, matchPaid, parseEfast, plain, type NewOrder, type PayOrder, type Partner, type PartnerAccount } from './logic'
+import { ageDays, guessKind, matchPaid, OP_GROUPS, parseEfast, plain, type NewOrder, type PayOrder, type Partner, type PartnerAccount } from './logic'
 import type { Tx } from '../finance/types'
 
 export interface PayData { orders: PayOrder[]; partners: Partner[]; accounts: PartnerAccount[]; txs: Tx[] }
@@ -19,10 +19,14 @@ const Chevron = ({ open }: { open: boolean }) => (
     style={{ transform: open ? 'rotate(0)' : 'rotate(-90deg)', transition: 'transform .15s' }}><path d="M6 9l6 6 6-6" /></svg>
 )
 
-export default function DebtTab({ data, reload, canEdit, goPartners }: { data: PayData; reload: () => void; canEdit: boolean; goPartners: () => void }) {
+export default function DebtTab({ data, reload, canEdit, goPartners, scope }: { data: PayData; reload: () => void; canEdit: boolean; goPartners: () => void; scope: 'goods' | 'operating' }) {
   const toast = useToast()
-  const [scope, setScope] = useState<'goods' | 'operating' | 'all'>('goods')
   const [status, setStatus] = useState<'pending' | 'paid' | 'all'>('pending')
+  const [subF, setSubF] = useState('')
+  const op = scope === 'operating'
+  const L = op
+    ? { total: 'Tổng chờ chi', n: 'lệnh chưa chi', old: 'Chờ chi trên 60 ngày', who: 'Đối tác đang chờ chi', head: 'Đối tác', empty: 'Chưa có lệnh chi phí vận hành nào', file: 'chi-phi-van-hanh' }
+    : { total: 'Tổng còn nợ', n: 'lệnh chưa chi', old: 'Nợ trên 60 ngày', who: 'Nhà cung cấp còn nợ', head: 'Nhà cung cấp', empty: 'Chưa có lệnh công nợ nào', file: 'cong-no-ncc' }
   const [age, setAge] = useState(0)
   const [q, setQ] = useState('')
   const [open, setOpen] = useState<Set<string>>(new Set())
@@ -36,10 +40,13 @@ export default function DebtTab({ data, reload, canEdit, goPartners }: { data: P
 
   const rows = useMemo(() => data.orders.map((o) => {
     const partner = acctPartner.get(o.account_no)
-    return { o, partner, key: partner?.id ?? `acct:${o.account_no}`, name: partner?.name ?? o.supplier_raw, age: ageDays(o, t0), match: matches.get(o.id) }
+    // Chưa đặt tên: tự nhận ra khoản vận hành (lương, thuê nhà, thuê xe, tạm ứng) theo nội dung lệnh
+    const guess = partner ? null : guessKind([o.note])
+    return { o, partner, kind: partner?.kind ?? guess!.kind, sub: partner?.sub_kind || guess?.sub || '', key: partner?.id ?? `acct:${o.account_no}`, name: partner?.name ?? o.supplier_raw, age: ageDays(o, t0), match: matches.get(o.id) }
   }), [data.orders, acctPartner, matches, t0])
 
-  const inScope = (r: (typeof rows)[number]) => scope === 'all' || (scope === 'operating' ? r.partner?.kind === 'operating' : r.partner?.kind !== 'operating')
+  // Hai mục tách riêng: Công nợ NCC (hàng hóa) và Chi phí vận hành (lương, thuê nhà, vận chuyển, tạm ứng)
+  const inScope = (r: (typeof rows)[number]) => (op ? r.kind === 'operating' : r.kind !== 'operating')
   const scoped = rows.filter(inScope)
   const pending = scoped.filter((r) => r.o.status === 'pending')
   const kpi = {
@@ -53,11 +60,12 @@ export default function DebtTab({ data, reload, canEdit, goPartners }: { data: P
   const shown = scoped.filter((r) =>
     (status === 'all' || r.o.status === status) &&
     (!age || r.age > age) &&
+    (!subF || r.sub === subF) &&
     (!needle || plain(`${r.name} ${r.o.supplier_raw} ${r.o.invoice_no} ${r.o.order_no ?? ''} ${r.o.account_no}`).includes(needle)))
   const groups = (() => {
-    const m = new Map<string, { key: string; name: string; partner?: Partner; acct: string; items: typeof shown }>()
+    const m = new Map<string, { key: string; name: string; partner?: Partner; kind: string; sub: string; acct: string; items: typeof shown }>()
     for (const r of shown) {
-      const g = m.get(r.key) ?? { key: r.key, name: r.name, partner: r.partner, acct: r.o.account_no, items: [] }
+      const g = m.get(r.key) ?? { key: r.key, name: r.name, partner: r.partner, kind: r.kind, sub: r.sub, acct: r.o.account_no, items: [] }
       g.items.push(r)
       m.set(r.key, g)
     }
@@ -67,7 +75,8 @@ export default function DebtTab({ data, reload, canEdit, goPartners }: { data: P
       .sort((a, b) => b.total - a.total)
   })()
 
-  const pendingAll = data.orders.filter((o) => o.status === 'pending')
+  const scopeIds = new Set(scoped.map((r) => r.o.id))
+  const pendingAll = data.orders.filter((o) => o.status === 'pending' && scopeIds.has(o.id))
   const matchList = pendingAll.filter((o) => matches.has(o.id))
 
   async function run(fn: () => Promise<void>, ok: string) {
@@ -80,8 +89,8 @@ export default function DebtTab({ data, reload, canEdit, goPartners }: { data: P
   }
 
   async function exportFile() {
-    await exportXlsx(`cong-no-ncc-${t0}.xlsx`,
-      ['Nhà cung cấp', 'Số tài khoản', 'Mã lệnh', 'Hóa đơn', 'Ngày hóa đơn', 'Ngày tạo lệnh', 'Tuổi nợ (ngày)', 'Số tiền', 'Trạng thái'],
+    await exportXlsx(`${L.file}-${t0}.xlsx`,
+      [L.head, 'Số tài khoản', 'Mã lệnh', 'Hóa đơn', 'Ngày hóa đơn', 'Ngày tạo lệnh', 'Tuổi nợ (ngày)', 'Số tiền', 'Trạng thái'],
       groups.flatMap((g) => g.items.map((r) => [g.name, r.o.account_no, r.o.order_no ?? '', r.o.invoice_no, r.o.invoice_date ? vnDate(r.o.invoice_date) : '', r.o.order_date ? vnDate(r.o.order_date) : '', r.age, r.o.amount, STATUS_LABEL[r.o.status]])))
   }
 
@@ -90,9 +99,9 @@ export default function DebtTab({ data, reload, canEdit, goPartners }: { data: P
   return (
     <div className="stack">
       <div className="mem-grid-4">
-        <div className="mem-card"><div className="mem-caption">Tổng còn nợ</div><div className="mem-kpi">{money(kpi.total)}</div><div className="mem-caption">{num(kpi.n)} lệnh chưa chi</div></div>
-        <div className="mem-card"><div className="mem-caption">Nợ trên 60 ngày</div><div className="mem-kpi">{money(kpi.old)}</div><div className="mem-caption">Tính từ ngày tạo lệnh</div></div>
-        <div className="mem-card"><div className="mem-caption">Nhà cung cấp còn nợ</div><div className="mem-kpi">{num(new Set(pending.map((r) => r.key)).size)}</div></div>
+        <div className="mem-card"><div className="mem-caption">{L.total}</div><div className="mem-kpi">{money(kpi.total)}</div><div className="mem-caption">{num(kpi.n)} {L.n}</div></div>
+        <div className="mem-card"><div className="mem-caption">{L.old}</div><div className="mem-kpi">{money(kpi.old)}</div><div className="mem-caption">Tính từ ngày tạo lệnh</div></div>
+        <div className="mem-card"><div className="mem-caption">{L.who}</div><div className="mem-kpi">{num(new Set(pending.map((r) => r.key)).size)}</div></div>
         <div className="mem-card"><div className="mem-caption">Số tài khoản chưa đặt tên</div><div className="mem-kpi">{num(kpi.unnamed)}</div>
           {kpi.unnamed > 0 && <button className="mem-btn mem-btn-sm" style={{ marginTop: 6 }} onClick={goPartners}>Đặt tên ngay</button>}</div>
       </div>
@@ -108,9 +117,11 @@ export default function DebtTab({ data, reload, canEdit, goPartners }: { data: P
         <div className="spread" style={{ flexWrap: 'wrap', gap: 10 }}>
           <div className="row" style={{ flexWrap: 'wrap' }}>
             <input className="input" style={{ width: 220 }} placeholder="Tìm nhà cung cấp, hóa đơn..." value={q} onChange={(e) => setQ(e.target.value)} aria-label="Tìm" />
-            <select className="input" style={{ width: 'auto' }} value={scope} onChange={(e) => setScope(e.target.value as typeof scope)} aria-label="Nhóm đối tác">
-              <option value="goods">Nhà cung cấp hàng hóa</option><option value="operating">Chi phí vận hành</option><option value="all">Tất cả</option>
-            </select>
+            {op && (
+              <select className="input" style={{ width: 'auto' }} value={subF} onChange={(e) => setSubF(e.target.value)} aria-label="Nhóm chi phí">
+                <option value="">Mọi nhóm</option>{OP_GROUPS.map((g) => <option key={g} value={g}>{g}</option>)}
+              </select>
+            )}
             <select className="input" style={{ width: 'auto' }} value={status} onChange={(e) => setStatus(e.target.value as typeof status)} aria-label="Trạng thái">
               <option value="pending">Còn nợ</option><option value="paid">Đã chi</option><option value="all">Mọi trạng thái</option>
             </select>
@@ -126,11 +137,11 @@ export default function DebtTab({ data, reload, canEdit, goPartners }: { data: P
         </div>
 
         {groups.length === 0 ? (
-          <Empty title={data.orders.length ? 'Không có lệnh nào khớp bộ lọc' : 'Chưa có lệnh công nợ nào'} hint={canEdit && !data.orders.length ? 'Bấm “Dán lệnh từ eFAST”, mở danh sách điện chờ duyệt trên eFAST, chọn tất cả, sao chép rồi dán vào.' : undefined} />
+          <Empty title={rows.some(inScope) ? 'Không có lệnh nào khớp bộ lọc' : L.empty} hint={canEdit && !data.orders.length ? 'Bấm “Dán lệnh từ eFAST”, mở danh sách điện chờ duyệt trên eFAST, chọn tất cả, sao chép rồi dán vào.' : undefined} />
         ) : (
           <div className="table-wrap">
             <table className="tbl">
-              <thead><tr><th>Nhà cung cấp</th><th className="num">Số lệnh</th><th className="num">Tuổi nợ lâu nhất</th><th className="num">Tổng tiền</th></tr></thead>
+              <thead><tr><th>{L.head}</th><th className="num">Số lệnh</th><th className="num">Tuổi nợ lâu nhất</th><th className="num">Tổng tiền</th></tr></thead>
               <tbody>
                 {groups.map((g) => {
                   const isOpen = open.has(g.key)
@@ -139,7 +150,7 @@ export default function DebtTab({ data, reload, canEdit, goPartners }: { data: P
                       <td><button type="button" className="row" style={{ background: 'none', border: 0, padding: 0, font: 'inherit', fontWeight: 800, cursor: 'pointer', textAlign: 'left' }} aria-expanded={isOpen}>
                         <Chevron open={isOpen} /> {g.name}</button>
                         {!g.partner && <span className="mem-tag mem-tag-warning" style={{ marginLeft: 8 }}>Chưa đặt tên · {maskAcct(g.acct)}</span>}
-                        {g.partner?.kind === 'operating' && <span className="mem-tag mem-tag-success" style={{ marginLeft: 8 }}>{g.partner.sub_kind || 'Vận hành'}</span>}</td>
+                        {g.kind === 'operating' && <span className="mem-tag mem-tag-success" style={{ marginLeft: 8 }}>{g.sub || 'Vận hành'}</span>}</td>
                       <td className="num">{g.items.length}</td>
                       <td className="num">{g.oldest} ngày</td>
                       <td className="num"><b>{money(g.total)}</b></td>
@@ -177,7 +188,7 @@ export default function DebtTab({ data, reload, canEdit, goPartners }: { data: P
                   ]
                 })}
               </tbody>
-              <tfoot><tr><td><b>Cộng ({groups.length} nhà cung cấp)</b></td><td className="num">{groups.reduce((s, g) => s + g.items.length, 0)}</td><td /><td className="num"><b>{money(groups.reduce((s, g) => s + g.total, 0))}</b></td></tr></tfoot>
+              <tfoot><tr><td><b>Cộng ({groups.length} {op ? 'đối tác' : 'nhà cung cấp'})</b></td><td className="num">{groups.reduce((s, g) => s + g.items.length, 0)}</td><td /><td className="num"><b>{money(groups.reduce((s, g) => s + g.total, 0))}</b></td></tr></tfoot>
             </table>
           </div>
         )}

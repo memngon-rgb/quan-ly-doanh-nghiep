@@ -32,7 +32,7 @@ export interface PayOrder {
 export type NewOrder = Omit<PayOrder, 'id' | 'status' | 'paid_date' | 'paid_tx_id'>
 
 export const KIND_LABEL: Record<PartnerKind, string> = { supplier: 'Nhà cung cấp hàng hóa', operating: 'Chi phí vận hành' }
-export const OP_GROUPS = ['Nhân sự', 'Mặt bằng', 'Vận chuyển', 'Khác']
+export const OP_GROUPS = ['Nhân sự', 'BHXH', 'Mặt bằng', 'Bảo vệ', 'Thuê thiết bị', 'Thuê kho', 'Vận chuyển', 'Khác']
 
 /** Bỏ dấu, viết hoa, gọn khoảng trắng: dùng để so khớp nội dung ngân hàng */
 export const plain = (s: unknown) =>
@@ -75,7 +75,9 @@ export function parseEfast(input: string): NewOrder[] {
     const content = (chunk.match(/NOI DUNG:\s*([\s\S]*?)\s*[\d.,]+\s*VND/) ?? [])[1] ?? ''
     const hd = content.match(/THEO\s+HD\s+(?:SO:?\s*)?(\S+)/)
     const ddh = content.match(/THEO\s+DDH\s+(?:TU\s+)?NGAY\s+(\S+)/)
-    const invoice_no = hd ? hd[1].replace(/[;,]+$/, '') : ddh ? `DDH ${ddh[1].replace(/[;,]+$/, '')}` : ''
+    // Nộp BHXH và các khoản theo tháng không có hóa đơn: dùng "Tháng m.yyyy" làm mã tham chiếu
+    const th = content.match(/THANG\s+(\d{1,2}\.\d{4})/)
+    const invoice_no = hd ? hd[1].replace(/[;,]+$/, '') : ddh ? `DDH ${ddh[1].replace(/[;,]+$/, '')}` : th ? `Tháng ${th[1]}` : ''
     const dm = content.match(/\sNGAY\s+(\S+)/)
     const invoice_date = hd && dm ? lastDate(dm[1]) : ddh ? lastDate(ddh[1]) : dm ? lastDate(dm[1]) : null
     const dates = [...chunk.matchAll(/(\d{2})-(\d{2})-(\d{4})\s+\d{2}:\d{2}:\d{2}/g)]
@@ -91,7 +93,7 @@ export function parseEfast(input: string): NewOrder[] {
 }
 
 /** Số hóa đơn dùng để dò trong nội dung sao kê (bỏ tiền tố ĐĐH) */
-const refToken = (o: Pick<PayOrder, 'invoice_no'>) => o.invoice_no.replace(/^DDH\s+/, '').trim()
+const refToken = (o: Pick<PayOrder, 'invoice_no'>) => plain(o.invoice_no).replace(/^DDH\s+/, '').trim()
 
 /**
  * Tìm khoản đã chi trong sổ thu chi cho các lệnh còn nợ: cùng số tiền, ngày chi từ ngày tạo lệnh trở đi,
@@ -111,6 +113,9 @@ export function matchPaid(orders: PayOrder[], txs: Tx[]): Map<string, Tx> {
         if (used.has(t.id) || t.amount !== o.amount) return false
         if (o.order_date && t.tx_date < o.order_date) return false
         const note = plain(t.note)
+        // Chi theo đợt: chỉ khớp khi lệnh và khoản chi cùng đợt (đợt 1 không được coi là đã trả đợt 2)
+        const dot = (x: string) => x.match(/\bDOT\s*(\d+)/)?.[1] ?? ''
+        if (dot(note) !== dot(plain(o.note))) return false
         const sameAcct = !!t.counterparty_account && t.counterparty_account === o.account_no
         if (ref) return note.includes(ref) && (sameAcct || !t.counterparty_account)
         return sameAcct
@@ -129,7 +134,8 @@ export function matchPaid(orders: PayOrder[], txs: Tx[]): Map<string, Tx> {
 /** Đoán loại đối tác từ nội dung các lệnh (lương, thuê nhà, vận chuyển -> chi phí vận hành) */
 export function guessKind(notes: string[]): { kind: PartnerKind; sub: string } {
   const t = plain(notes.join(' '))
-  if (/LUONG/.test(t)) return { kind: 'operating', sub: 'Nhân sự' }
+  if (/BAO HIEM XA HOI|BHXH/.test(t)) return { kind: 'operating', sub: 'BHXH' }
+  if (/LUONG|TAM UNG/.test(t)) return { kind: 'operating', sub: 'Nhân sự' }
   if (/TIEN THUE (NHA|MAT BANG)|CHI PHI THUE NHA|THUE NHA/.test(t)) return { kind: 'operating', sub: 'Mặt bằng' }
   if (/THUE LAI XE|VAN CHUYEN|VANCHUYEN/.test(t)) return { kind: 'operating', sub: 'Vận chuyển' }
   return { kind: 'supplier', sub: '' }

@@ -8,7 +8,7 @@ import { guessKind, KIND_LABEL, OP_GROUPS, plain, type Partner, type PartnerAcco
 
 interface Unnamed { account_no: string; names: string[]; notes: string[]; orders: number; owed: number; txs: number; paid: number }
 
-export default function PartnersTab({ data, reload, canEdit }: { data: PayData; reload: () => void; canEdit: boolean }) {
+export default function PartnersTab({ data, reload, canEdit, kindFilter }: { data: PayData; reload: () => void; canEdit: boolean; kindFilter?: PartnerKind }) {
   const toast = useToast()
   const [dlg, setDlg] = useState<{ init?: PartnerInput; accounts?: { account_no: string; seen_name: string }[]; hint?: { kind: PartnerKind; sub: string } } | null>(null)
   const [q, setQ] = useState('')
@@ -38,8 +38,8 @@ export default function PartnersTab({ data, reload, canEdit }: { data: PayData; 
       u.paid += t.amount
       put(u)
     }
-    return [...m.values()].filter((u) => u.owed > 0 || u.paid > 0).sort((a, b) => b.owed + b.paid - (a.owed + a.paid))
-  }, [data.orders, data.txs, named])
+    return [...m.values()].filter((u) => (u.owed > 0 || u.paid > 0) && (!kindFilter || guessKind(u.notes).kind === kindFilter)).sort((a, b) => b.owed + b.paid - (a.owed + a.paid))
+  }, [data.orders, data.txs, named, kindFilter])
 
   const owedByPartner = useMemo(() => {
     const acctPartner = new Map(data.accounts.map((a) => [a.account_no, a.partner_id]))
@@ -49,7 +49,7 @@ export default function PartnersTab({ data, reload, canEdit }: { data: PayData; 
   }, [data.orders, data.accounts])
 
   const needle = plain(q)
-  const list = data.partners.filter((p) => !needle || plain(p.name).includes(needle))
+  const list = data.partners.filter((p) => (!kindFilter || p.kind === kindFilter) && (!needle || plain(p.name).includes(needle)))
 
   return (
     <div className="stack">
@@ -78,10 +78,10 @@ export default function PartnersTab({ data, reload, canEdit }: { data: PayData; 
 
       <div className="mem-card stack">
         <div className="spread" style={{ flexWrap: 'wrap', gap: 10 }}>
-          <div><div className="section-title">Đối tác ({data.partners.length})</div><div className="mem-caption">Nhà cung cấp hàng hóa và chi phí vận hành (nhân sự, mặt bằng, vận chuyển). Chi phí vận hành không nằm trong công nợ nhà cung cấp.</div></div>
+          <div><div className="section-title">Đối tác ({list.length})</div><div className="mem-caption">Nhà cung cấp hàng hóa và chi phí vận hành (nhân sự, mặt bằng, vận chuyển). Chi phí vận hành không nằm trong công nợ nhà cung cấp.</div></div>
           <div className="row">
             <input className="input" style={{ width: 200 }} placeholder="Tìm đối tác..." value={q} onChange={(e) => setQ(e.target.value)} aria-label="Tìm đối tác" />
-            {canEdit && <button className="mem-btn mem-btn-primary" onClick={() => setDlg({ init: { name: '', kind: 'supplier', sub_kind: '', note: '', accounts: [] } })}><IconPlus /> Thêm đối tác</button>}
+            {canEdit && <button className="mem-btn mem-btn-primary" onClick={() => setDlg({ init: { name: '', kind: kindFilter ?? 'supplier', sub_kind: '', note: '', accounts: [] } })}><IconPlus /> Thêm đối tác</button>}
           </div>
         </div>
         {list.length === 0 ? <Empty title="Chưa có đối tác nào" hint="Đặt tên cho các số tài khoản ở bảng “Chưa đặt tên” phía trên, hoặc thêm thủ công." /> : (

@@ -7,13 +7,17 @@ import { fetchCompanyTheme, useTheme } from './theme'
 import { resetDemo } from './demo'
 import { ROLE_LABEL, type AppModule } from './types'
 
+/** Thứ tự các nhóm trong thanh bên ('' = mục đứng riêng ở trên cùng). Nhóm lạ tự xếp ngay trước Quản trị. */
+const GROUP_ORDER = ['', 'Dòng tiền', 'Chi phí & công nợ', 'Phân tích', 'Cửa hàng', 'Kho', 'Quản trị']
+
 export function Layout({ modules }: { modules: AppModule[] }) {
   const { access, can, signOut, branches } = useAuth()
   const theme = useTheme()
   useEffect(() => { void fetchCompanyTheme().catch(() => undefined) }, [])
-  const visible = modules
-    .map((m) => ({ ...m, nav: m.nav.filter((n) => can(n.perm)) }))
-    .filter((m) => m.nav.length > 0)
+  // Gom các mục theo nhóm (mỗi mục tự khai báo nhóm), sắp nhóm theo thứ tự cố định bên dưới
+  const items = modules.flatMap((m) => m.nav.filter((n) => can(n.perm)).map((n) => ({ ...n, group: n.group ?? m.title })))
+  const rank = (g: string) => { const i = GROUP_ORDER.indexOf(g); return i >= 0 ? i : GROUP_ORDER.indexOf('Quản trị') - 0.5 }
+  const groups = [...new Set(items.map((i) => i.group))].sort((a, b) => rank(a) - rank(b))
 
   return (
     <div className="mem-app">
@@ -26,10 +30,10 @@ export function Layout({ modules }: { modules: AppModule[] }) {
           </div>
           <span>{theme.name}</span>
         </div>
-        {visible.map((m) => (
-          <div key={m.id} style={{ display: 'contents' }}>
-            <div className="nav-group">{m.title}</div>
-            {m.nav.map((n) => (
+        {groups.map((g) => (
+          <div key={g || 'top'} style={{ display: 'contents' }}>
+            {g && <div className="nav-group">{g}</div>}
+            {items.filter((n) => n.group === g).map((n) => (
               <NavLink key={n.path} to={n.path} end className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
                 {n.icon}
                 <span>{n.label}</span>

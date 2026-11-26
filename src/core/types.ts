@@ -37,6 +37,7 @@ export interface NavItem {
   label: string
   icon: ReactNode
   perm: string // quyền cần có để thấy mục này
+  group?: string // tên nhóm trong thanh bên ('' = đứng riêng, không có tiêu đề); mặc định theo tên mô-đun
 }
 
 export interface ModuleRoute {

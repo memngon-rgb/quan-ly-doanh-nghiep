@@ -97,8 +97,16 @@ export async function addOrders(rows: NewOrder[]): Promise<number> {
   const withNo = rows.filter((r) => r.order_no)
   const noNo = rows.filter((r) => !r.order_no)
   let added = 0
-  for (let i = 0; i < withNo.length; i += 200) {
-    const { data, error } = await sb().from(T_ORDER).upsert(withNo.slice(i, i + 200), { onConflict: 'order_no', ignoreDuplicates: true }).select('id')
+  // Bỏ qua lệnh đã có (cùng mã lệnh): tự kiểm tra trước rồi thêm, không dùng upsert vì chỉ mục mã lệnh có điều kiện
+  const have = new Set<string>()
+  for (let i = 0; i < withNo.length; i += 100) {
+    const { data, error } = await sb().from(T_ORDER).select('order_no').in('order_no', withNo.slice(i, i + 100).map((r) => r.order_no as string))
+    if (error) throw error
+    ;(data ?? []).forEach((r: { order_no: string }) => have.add(r.order_no))
+  }
+  const fresh = withNo.filter((r) => !have.has(r.order_no as string))
+  for (let i = 0; i < fresh.length; i += 200) {
+    const { data, error } = await sb().from(T_ORDER).insert(fresh.slice(i, i + 200)).select('id')
     if (error) throw error
     added += data?.length ?? 0
   }

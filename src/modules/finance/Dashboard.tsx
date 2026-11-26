@@ -20,7 +20,10 @@ export default function Dashboard() {
     const { from, to } = range
     const inMonth = summarize(tx.filter((t) => t.tx_date >= from && t.tx_date <= to), sales.filter((s) => s.sale_date >= from && s.sale_date <= to), cats)
     const t = today()
-    const todaySum = summarize(tx.filter((x) => x.tx_date === t), sales.filter((s) => s.sale_date === t), cats)
+    // Chưa có số liệu hôm nay (thường do chưa nhập/import) thì hiện ngày gần nhất có doanh thu
+    const lastSale = sales.reduce((m, s) => (s.sale_date <= t && s.sale_date > m ? s.sale_date : m), '')
+    const dayShown = !sales.some((s) => s.sale_date === t) && lastSale ? lastSale : t
+    const todaySum = summarize(tx.filter((x) => x.tx_date === dayShown), sales.filter((s) => s.sale_date === dayShown), cats)
     const plan = rangePlan(from, to, tx, sales, cats, items)
     const f = plan.last
     const days = monthRange(to.slice(0, 7)).days
@@ -39,12 +42,12 @@ export default function Dashboard() {
     if (inMonth.revenue > 0 && f.cogsPctAuto !== null && inMonth.byGroup.cogs / inMonth.revenue > plan.cogsPct + 0.05)
       alerts.push({ cls: 'warn', title: 'Giá vốn cao hơn dự tính', text: `Hiện ${pct(inMonth.byGroup.cogs / inMonth.revenue)} doanh thu, dự tính ${pct(plan.cogsPct)}.` })
     if (to === t && todaySum.expense === 0 && new Date().getHours() >= 18) alerts.push({ cls: 'warn', title: 'Hôm nay chưa có khoản chi nào được ghi', text: 'Kiểm tra xem kế toán đã nhập chi hôm nay chưa.' })
-    return { inMonth, todaySum, plan, series, alerts, avgRev, days, sim }
+    return { dayShown, inMonth, todaySum, plan, series, alerts, avgRev, days, sim }
   }, [d.data, range.from, range.to])
 
   if (d.loading) return <Loading />
   if (d.error || !v || !d.data) return <ErrorBox error={d.error} retry={d.reload} />
-  const { inMonth, todaySum, plan, series, alerts, sim } = v
+  const { dayShown, inMonth, todaySum, plan, series, alerts, sim } = v
   const maxBar = Math.max(1, ...series.flatMap((s) => [s.rev, s.exp]))
   const afterVat = inMonth.revenue - inMonth.vat
   const gross = afterVat - inMonth.byGroup.cogs
@@ -75,7 +78,7 @@ export default function Dashboard() {
       </div>
 
       <div className="mem-grid-4">
-        <Metric label="Doanh thu hôm nay" value={money(todaySum.revenue)} note={`Chi hôm nay ${money(todaySum.expense)}`} icon={<IconWallet />} bg="var(--mem-green-soft)" />
+        <Metric label={dayShown === today() ? 'Doanh thu hôm nay' : `Doanh thu ngày ${vnDate(dayShown)}`} value={money(todaySum.revenue)} note={`${dayShown === today() ? 'Chi hôm nay' : 'Chi cùng ngày'} ${money(todaySum.expense)}`} icon={<IconWallet />} bg="var(--mem-green-soft)" />
         <Metric label="Tổng chi trong kỳ" value={money(inMonth.expense)} note={inMonth.revenue > 0 ? `${pct(inMonth.expense / inMonth.revenue)} doanh thu` : ''} icon={<IconChart />} bg="var(--mem-peach)" />
         <Metric label="Lãi gộp" value={money(gross)} note={inMonth.revenue > 0 ? `Biên ${pct(gross / inMonth.revenue)}` : ''} icon={<IconTrend />} bg="var(--mem-blue)" />
         <Metric label="Dòng tiền (thu − chi)" value={money(inMonth.income - inMonth.expense)} note={`Thu ${short(inMonth.income)} · Chi ${short(inMonth.expense)}`} icon={<IconWallet />} bg="var(--mem-green-soft)" tone={inMonth.income - inMonth.expense >= 0 ? 'pos' : 'neg'} />

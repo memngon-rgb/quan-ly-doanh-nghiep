@@ -1,5 +1,5 @@
 import { useAuth } from '../../core/auth'
-import { monthRange, shiftMonth } from '../../core/format'
+import { monthRange, shiftMonth, today } from '../../core/format'
 import type { Range } from '../../core/DateRange'
 import { useAsync } from '../../core/ui'
 import { listCategories, listForecast, listSales, listTx } from './api'
@@ -25,13 +25,15 @@ export function useMonthData(month: string) {
 export function useRangeData(range: Range) {
   const { branchId } = useAuth()
   const from = monthRange(shiftMonth(range.from.slice(0, 7), -3)).from
+  // luôn tải đến hết hôm nay để thẻ "hôm nay" đúng dù khoảng chọn kết thúc sớm hơn
+  const to = range.to > today() ? range.to : today()
   return useAsync(async () => {
     const [cats, tx, sales, items] = await Promise.all([
       listCategories(),
-      listTx(branchId, from, range.to),
-      listSales(branchId, from, range.to),
+      listTx(branchId, from, to),
+      listSales(branchId, from, to),
       branchId ? listForecast(branchId) : Promise.resolve([]),
     ])
     return { cats, tx, sales, items }
-  }, [branchId, from, range.to])
+  }, [branchId, from, to])
 }
