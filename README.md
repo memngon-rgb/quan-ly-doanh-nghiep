@@ -21,7 +21,7 @@ Mở địa chỉ hiện ra (thường là http://localhost:5173).
 ## 2. Kết nối Supabase (dữ liệu thật)
 
 1. Vào https://supabase.com, tạo tài khoản và **New project** (chọn vùng Singapore cho nhanh).
-2. Vào **SQL Editor**, mở lần lượt từng file trong `supabase/migrations/` theo thứ tự số (`0001_core.sql`, rồi `0002_finance.sql`), dán nội dung và bấm **Run**.
+2. Vào **SQL Editor**, mở lần lượt từng file trong `supabase/migrations/` theo thứ tự số (`0001_core.sql`, `0002_finance.sql`, rồi `0003_grants.sql`), dán nội dung và bấm **Run**.
 3. Vào **Authentication → Providers → Email**: tắt **Allow new users to sign up** để người lạ không tự đăng ký.
 4. Vào **Authentication → Users → Add user**, tạo tài khoản đầu tiên của bạn. **Tài khoản đầu tiên tự thành Chủ.** Các tài khoản sau là Nhân viên, bạn vào mục Quản trị → Người dùng của web để gán vai trò và chi nhánh.
 5. Vào **Project Settings → API**, chép `Project URL` và khóa `anon public`.
