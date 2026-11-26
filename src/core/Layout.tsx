@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { Link, NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from './auth'
 import { IconLogout } from './icons'
 import { isDemo } from './supabase'
@@ -48,6 +48,9 @@ export function Layout({ modules }: { modules: AppModule[] }) {
             DỮ LIỆU MINH HỌA · Bản xem thử, chưa kết nối Supabase. Dữ liệu chỉ lưu trong trình duyệt này.{' '}
             <button className="mem-btn mem-btn-sm" onClick={() => { resetDemo(); location.reload() }}>Đặt lại dữ liệu mẫu</button>
           </div>
+        )}
+        {branches.length === 0 && can('admin.users') && (
+          <div className="banner">Bước đầu tiên: bạn chưa có chi nhánh nào. <Link to="/admin/users">Bấm vào đây để thêm chi nhánh</Link> (ví dụ tên cửa hàng), sau đó mới nhập được thu chi.</div>
         )}
         <div className="topbar">
           <div className="eyebrow">{new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}</div>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { useAuth } from '../../core/auth'
 import { Empty, ErrorBox, Loading, Modal, PageHead, errText, useAsync, useToast } from '../../core/ui'
 import { isDemo } from '../../core/supabase'
@@ -11,10 +11,24 @@ export default function Users() {
   const users = useAsync(listUsers, [])
   const [edit, setEdit] = useState<UserRow | null>(null)
   const [bname, setBname] = useState('')
+  const [bbusy, setBbusy] = useState(false)
+  const [berr, setBerr] = useState('')
 
-  async function addBranch() {
-    if (!bname.trim()) return
-    try { await saveBranch({ name: bname.trim() }); setBname(''); await reloadBranches(); toast('Đã thêm chi nhánh') } catch (e) { toast(errText(e), true) }
+  async function addBranch(e: FormEvent) {
+    e.preventDefault()
+    if (!bname.trim()) return setBerr('Hãy gõ tên chi nhánh trước, ví dụ: Cửa hàng 1.')
+    setBerr('')
+    setBbusy(true)
+    try {
+      await saveBranch({ name: bname.trim() })
+      setBname('')
+      await reloadBranches()
+      toast('Đã thêm chi nhánh')
+    } catch (e2) {
+      setBerr(errText(e2))
+    } finally {
+      setBbusy(false)
+    }
   }
   async function renameBranch(id: string, current: string) {
     const n = prompt('Tên chi nhánh mới', current)
@@ -32,6 +46,7 @@ export default function Users() {
 
       <div className="mem-card stack">
         <div className="section-title">Chi nhánh</div>
+        {branches.length === 0 && <div className="alert warn"><div><span className="t">Chưa có chi nhánh nào.</span> Gõ tên cửa hàng vào ô bên dưới rồi bấm “Thêm chi nhánh”. Phải có ít nhất 1 chi nhánh thì mới nhập được thu chi.</div></div>}
         {branches.map((b) => (
           <div key={b.id} className="list-item">
             <b>{b.name}</b>
@@ -41,10 +56,11 @@ export default function Users() {
             </div>
           </div>
         ))}
-        <div className="row">
-          <input className="input" style={{ flex: 1, minWidth: 180 }} placeholder="Tên chi nhánh mới" value={bname} onChange={(e) => setBname(e.target.value)} aria-label="Tên chi nhánh mới" />
-          <button className="mem-btn mem-btn-primary" onClick={() => void addBranch()}>Thêm chi nhánh</button>
-        </div>
+        <form className="row" onSubmit={(e) => void addBranch(e)}>
+          <input className="input" style={{ flex: 1, minWidth: 180 }} placeholder="Tên chi nhánh mới" value={bname} onChange={(e) => { setBname(e.target.value); setBerr('') }} aria-label="Tên chi nhánh mới" />
+          <button className="mem-btn mem-btn-primary" disabled={bbusy}>{bbusy ? 'Đang thêm...' : 'Thêm chi nhánh'}</button>
+        </form>
+        {berr && <div className="alert bad" role="alert">{berr}</div>}
       </div>
 
       <div className="mem-card stack">

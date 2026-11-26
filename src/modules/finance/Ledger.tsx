@@ -177,7 +177,7 @@ function TxForm({ tx, cats, onClose, onSaved }: { tx: Tx | null; cats: Category[
 
   async function submit(e: FormEvent, again = false) {
     e.preventDefault()
-    if (!branch) return setErr('Chưa chọn chi nhánh.')
+    if (!branch) return setErr('Chưa có chi nhánh. Hãy vào Quản trị → Người dùng để thêm chi nhánh trước.')
     if (!amount) return setErr('Hãy nhập số tiền.')
     setBusy(true)
     setErr('')
@@ -205,6 +205,7 @@ function TxForm({ tx, cats, onClose, onSaved }: { tx: Tx | null; cats: Category[
   return (
     <Modal title={tx ? 'Sửa khoản thu chi' : 'Thêm khoản thu chi'} onClose={onClose}>
       <form className="stack" onSubmit={(e) => void submit(e)}>
+        {branches.length === 0 && <div className="alert warn"><div><span className="t">Chưa có chi nhánh nào.</span> Hãy đóng cửa sổ này, vào <a href="#/admin/users">Quản trị → Người dùng</a> để thêm chi nhánh (tên cửa hàng) trước.</div></div>}
         <div className="seg" role="group" aria-label="Loại khoản">
           <button type="button" className={type === 'expense' ? 'on exp' : ''} onClick={() => { setType('expense'); setCatId('') }}>Chi</button>
           <button type="button" className={type === 'income' ? 'on' : ''} onClick={() => { setType('income'); setCatId('') }}>Thu</button>
@@ -230,8 +231,8 @@ function TxForm({ tx, cats, onClose, onSaved }: { tx: Tx | null; cats: Category[
         {err && <div className="alert bad" role="alert">{err}</div>}
         <div className="row" style={{ justifyContent: 'flex-end' }}>
           <button type="button" className="mem-btn" onClick={onClose}>Hủy</button>
-          {!tx && <button type="button" className="mem-btn" disabled={busy} onClick={(e) => void submit(e as unknown as FormEvent, true)}>Lưu và nhập tiếp</button>}
-          <button className="mem-btn mem-btn-primary" disabled={busy}>{busy ? 'Đang lưu...' : 'Lưu'}</button>
+          {!tx && <button type="button" className="mem-btn" disabled={busy || branches.length === 0} onClick={(e) => void submit(e as unknown as FormEvent, true)}>Lưu và nhập tiếp</button>}
+          <button className="mem-btn mem-btn-primary" disabled={busy || branches.length === 0}>{busy ? 'Đang lưu...' : 'Lưu'}</button>
         </div>
       </form>
     </Modal>
