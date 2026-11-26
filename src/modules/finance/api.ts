@@ -150,7 +150,21 @@ export async function importTx(rows: NewTx[]): Promise<number> {
     if (error) throw error
     added += data?.length ?? 0
   }
+  await fillCounterparty(rows)
   return added
+}
+
+/** Nhập lại sao kê đã có: bổ sung số tài khoản đối ứng cho các dòng cũ còn thiếu (không đụng vào danh mục, ghi chú đã sửa) */
+async function fillCounterparty(rows: NewTx[]): Promise<void> {
+  const withAcct = rows.filter((r) => r.counterparty_account && r.external_key)
+  for (let i = 0; i < withAcct.length; i += 20) {
+    await Promise.all(withAcct.slice(i, i + 20).map(async (r) => {
+      const { error } = await sb().from('fin_transactions')
+        .update({ counterparty_account: r.counterparty_account, counterparty_name: r.counterparty_name ?? '' })
+        .eq('branch_id', r.branch_id).eq('external_key', r.external_key as string).is('counterparty_account', null)
+      if (error) throw error
+    }))
+  }
 }
 
 /* ======================= Doanh thu theo ngày ======================= */

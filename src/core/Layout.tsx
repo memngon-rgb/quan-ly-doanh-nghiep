@@ -8,7 +8,7 @@ import { resetDemo } from './demo'
 import { ROLE_LABEL, type AppModule } from './types'
 
 export function Layout({ modules }: { modules: AppModule[] }) {
-  const { access, can, signOut, branches, branchId, setBranchId } = useAuth()
+  const { access, can, signOut, branches } = useAuth()
   const theme = useTheme()
   useEffect(() => { void fetchCompanyTheme().catch(() => undefined) }, [])
   const visible = modules
@@ -58,17 +58,6 @@ export function Layout({ modules }: { modules: AppModule[] }) {
         {branches.length === 0 && can('admin.users') && (
           <div className="banner">Bước đầu tiên: bạn chưa có chi nhánh nào. <Link to="/admin/users">Bấm vào đây để thêm chi nhánh</Link> (ví dụ tên cửa hàng), sau đó mới nhập được thu chi.</div>
         )}
-        <div className="topbar">
-          <div className="eyebrow">{new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}</div>
-          <div className="topbar-right">
-            {branches.length > 1 && (
-              <select className="input" style={{ width: 'auto', minHeight: 38 }} value={branchId} onChange={(e) => setBranchId(e.target.value)} aria-label="Chọn chi nhánh">
-                <option value="">Tất cả chi nhánh</option>
-                {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </select>
-            )}
-          </div>
-        </div>
         <Outlet />
       </main>
     </div>

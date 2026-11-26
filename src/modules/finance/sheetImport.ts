@@ -18,6 +18,13 @@ const SRC_BY_LABEL: Record<string, Src> = {
   'tien mat': 'cash', momo: 'momo', 'chuyen khoan': 'transfer', grab: 'grab', 'shopee food': 'shopee', shopeefood: 'shopee', 'be food': 'be', befood: 'be', 'xanh sm': 'gsm',
 }
 
+/** Ô ngày trong file Excel là kiểu ngày (đọc ra Date, 00:00 giờ UTC) hoặc chữ “dd/mm” khi tải từ CSV. */
+function sheetDate(v: unknown, year: number): string | null {
+  if (v instanceof Date && !Number.isNaN(v.getTime())) return v.toISOString().slice(0, 10)
+  const m = String(v ?? '').trim().match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?$/)
+  return m ? `${m[3] ?? year}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : null
+}
+
 /**
  * Đọc file Excel đối soát của kế toán (các sheet “ĐS DT …”, mỗi cửa hàng một sheet, mỗi ngày nhiều dòng theo nguồn tiền).
  * Số cửa hàng khai = cột “THỰC NHẬN (Kế toán nhập)”; truy thu = phần thiếu so với cột “THỰC TẾ”;
@@ -45,10 +52,9 @@ export function parseReconSheets(sheets: { name: string; rows: Cell[][] }[], bra
     const ded = new Map<string, SheetDeduction>()
     const days = new Set<string>()
     for (const r of sh.rows.slice(h + 1)) {
-      const m = String(r[c.date] ?? '').trim().match(/^(\d{1,2})\/(\d{1,2})$/)
       const src = SRC_BY_LABEL[normText(r[c.label])]
-      if (!m || !src) continue
-      const date = `${year}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`
+      const date = sheetDate(r[c.date], year)
+      if (!date || !src) continue
       const pos = num(r, c.pos), expected = num(r, c.actual), booked = num(r, c.booked)
       if (pos === 0 && expected === 0 && booked === 0) continue
       days.add(date)

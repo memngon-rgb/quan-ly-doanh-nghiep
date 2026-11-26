@@ -74,15 +74,18 @@ export function ErrorBox({ error, retry }: { error: unknown; retry?: () => void 
   )
 }
 
-export function PageHead({ eyebrow, title, sub, right }: { eyebrow?: string; title: string; sub?: string; right?: ReactNode }) {
+/** Đầu trang thống nhất: tiêu đề + mô tả; ngay dưới là một hàng gồm bộ lọc (ngày, chi nhánh) bên trái và các nút thao tác nhỏ bên phải. */
+export function PageHead({ title, sub, right, controls }: { eyebrow?: string; title: string; sub?: string; right?: ReactNode; controls?: ReactNode }) {
   return (
-    <div className="spread" style={{ alignItems: 'flex-end', marginBottom: 18 }}>
-      <div>
-        {eyebrow && <div className="eyebrow">{eyebrow}</div>}
-        <h1 className="page-title">{title}</h1>
-        {sub && <p className="page-sub" style={{ margin: 0 }}>{sub}</p>}
-      </div>
-      {right && <div className="row">{right}</div>}
+    <div style={{ marginBottom: 18 }}>
+      <h1 className="page-title">{title}</h1>
+      {sub && <p className="page-sub" style={{ margin: 0 }}>{sub}</p>}
+      {(controls || right) && (
+        <div className="row" style={{ marginTop: 14, justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="row">{controls}</div>
+          {right && <div className="row head-actions">{right}</div>}
+        </div>
+      )}
     </div>
   )
 }

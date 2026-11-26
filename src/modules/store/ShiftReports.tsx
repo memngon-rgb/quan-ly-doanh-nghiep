@@ -1,6 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { useAuth } from '../../core/auth'
-import { DateRangePicker, useDateRange } from '../../core/DateRange'
+import type { Range } from '../../core/DateRange'
 import { today, vnDate } from '../../core/format'
 import { compressImage } from '../../core/image'
 import { Empty, ErrorBox, Loading, Modal, errText, useAsync, useToast } from '../../core/ui'
@@ -24,11 +24,10 @@ const SECTIONS: Record<ShiftKind, { key: string; label: string; hint: string }[]
 }
 
 /** Báo cáo ca: tác phong đầu ca và báo cáo kết ca, thay cho tin nhắn gửi Zalo. */
-export default function ShiftReports() {
+export default function ShiftReports({ range }: { range: Range }) {
   const { branches: all, branchId } = useAuth()
   const branches = all.filter(isStore)
   const toast = useToast()
-  const [range, setRange] = useDateRange()
   const [writing, setWriting] = useState(false)
   const list = useAsync(() => listShiftReports(branchId, range.from, range.to), [branchId, range.from, range.to])
   const [noteOf, setNoteOf] = useState<ShiftReport | null>(null)
@@ -37,7 +36,7 @@ export default function ShiftReports() {
   return (
     <div className="stack">
       <div className="spread">
-        <DateRangePicker value={range} onChange={setRange} />
+        <span />
         <button className="mem-btn mem-btn-primary" onClick={() => setWriting(true)} disabled={branches.length === 0}>Gửi báo cáo ca</button>
       </div>
       {list.loading ? <Loading /> : list.error ? <ErrorBox error={list.error} retry={list.reload} /> : (list.data ?? []).length === 0 ? (

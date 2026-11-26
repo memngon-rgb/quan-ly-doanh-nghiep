@@ -36,6 +36,8 @@ export interface Tx {
   receipt_path: string | null
   source: 'manual' | 'import'
   external_key: string | null
+  counterparty_account?: string | null // số tài khoản đối ứng (từ sao kê ngân hàng)
+  counterparty_name?: string | null
   created_by: string
 }
 

@@ -3,6 +3,7 @@ import { useAuth } from '../../core/auth'
 import { compressImage } from '../../core/image'
 import { exportXlsx } from '../../core/excel'
 import { money, num, today, vnDate } from '../../core/format'
+import { BranchSelect } from '../../core/BranchSelect'
 import { DateRangePicker, useDateRange } from '../../core/DateRange'
 import { Empty, ErrorBox, Loading, Modal, MoneyInput, PageHead, errText, useAsync, useToast } from '../../core/ui'
 import { IconDownload, IconPlus, IconUpload } from '../../core/icons'
@@ -18,6 +19,7 @@ export default function Ledger() {
   const [range, setRange] = useDateRange()
   const [type, setType] = useState<'' | TxType>('')
   const [catId, setCatId] = useState('')
+  const [method, setMethodF] = useState<'' | Method>('')
   const [q, setQ] = useState('')
   const [limit, setLimit] = useState(PAGE)
   const [editing, setEditing] = useState<Tx | 'new' | null>(null)
@@ -35,9 +37,10 @@ export default function Ledger() {
       (t) =>
         (!type || t.type === type) &&
         (!catId || t.category_id === catId) &&
+        (!method || t.method === method) &&
         (!kw || t.note.toLowerCase().includes(kw) || (catName.get(t.category_id ?? '') ?? '').toLowerCase().includes(kw)),
     )
-  }, [tx.data, type, catId, q, catName])
+  }, [tx.data, type, catId, method, q, catName])
 
   const totals = useMemo(() => {
     let inc = 0
@@ -79,6 +82,7 @@ export default function Ledger() {
   return (
     <div className="stack">
       <PageHead
+        controls={<><DateRangePicker value={range} onChange={setRange} /><BranchSelect /></>}
         eyebrow="Tài chính"
         title="Sổ thu chi"
         sub="Ghi nhận dòng tiền hằng ngày: kế toán chi theo lệnh công ty, thu chi tiền mặt cửa hàng."
@@ -93,13 +97,16 @@ export default function Ledger() {
 
       <div className="mem-card stack">
         <div className="row">
-          <DateRangePicker value={range} onChange={setRange} />
           <select className="input" style={{ width: 'auto' }} value={type} onChange={(e) => setType(e.target.value as '' | TxType)} aria-label="Lọc loại">
             <option value="">Thu và chi</option><option value="income">Chỉ thu</option><option value="expense">Chỉ chi</option>
           </select>
           <select className="input" style={{ width: 'auto' }} value={catId} onChange={(e) => setCatId(e.target.value)} aria-label="Lọc danh mục">
             <option value="">Mọi danh mục</option>
             {(cats.data ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          <select className="input" style={{ width: 'auto' }} value={method} onChange={(e) => setMethodF(e.target.value as '' | Method)} aria-label="Lọc hình thức">
+            <option value="">Mọi hình thức</option>
+            {(Object.keys(METHOD_LABEL) as Method[]).map((m) => <option key={m} value={m}>{METHOD_LABEL[m]}</option>)}
           </select>
           <input className="input" style={{ flex: 1, minWidth: 160 }} placeholder="Tìm theo ghi chú, danh mục..." value={q} onChange={(e) => setQ(e.target.value)} aria-label="Tìm kiếm" />
         </div>

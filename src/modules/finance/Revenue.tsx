@@ -10,15 +10,16 @@ import ImportPanel from './Import'
 
 /** Doanh thu theo ngày (lấy từ báo cáo iPOS A02 và B03). Nhập file doanh thu nằm ngay tại đây. */
 export default function Revenue() {
-  const { branchId, branches, can } = useAuth()
+  const { branches, can } = useAuth()
   const toast = useToast()
   const [range, setRange] = useDateRange()
   const [importing, setImporting] = useState(false)
   const [tab, setTab] = useState<'store' | 'channel'>('store')
-  const [showDays, setShowDays] = useState(false)
+  const [showDays, setShowDays] = useState(true)
+  const [dayBranch, setDayBranch] = useState('')
   const [chanBranch, setChanBranch] = useState('')
-  const sales = useAsync(() => listSales(branchId, range.from, range.to), [branchId, range.from, range.to])
-  const chans = useAsync(() => listChannels(branchId, range.from, range.to), [branchId, range.from, range.to])
+  const sales = useAsync(() => listSales('', range.from, range.to), [range.from, range.to])
+  const chans = useAsync(() => listChannels('', range.from, range.to), [range.from, range.to])
   const branchName = useMemo(() => new Map(branches.map((b) => [b.id, b.name])), [branches])
 
   const rows = useMemo(
@@ -44,6 +45,11 @@ export default function Revenue() {
     }
     return [...m.entries()].map(([id, v]) => ({ id, name: branchName.get(id) ?? '—', ...v })).sort((a, b) => b.net - a.net)
   }, [rows, branchName])
+
+  const dayRows = useMemo(
+    () => rows.filter((x) => !dayBranch || x.branch_id === dayBranch).sort((a, b) => (a.sale_date === b.sale_date ? (branchName.get(a.branch_id) ?? '').localeCompare(branchName.get(b.branch_id) ?? '') : a.sale_date.localeCompare(b.sale_date))),
+    [rows, dayBranch, branchName],
+  )
 
   const byChannel = useMemo(() => {
     const m = new Map<string, { orders: number; gross: number; discount: number; commission: number; net: number }>()
@@ -82,6 +88,7 @@ export default function Revenue() {
   return (
     <div className="stack">
       <PageHead
+        controls={<DateRangePicker value={range} onChange={setRange} />}
         eyebrow="Tài chính"
         title="Doanh thu"
         sub="Doanh thu bán hàng theo ngày từ POS. Tải báo cáo iPOS A02 (theo cửa hàng) và B03 (theo nguồn đơn)."
@@ -94,8 +101,6 @@ export default function Revenue() {
       />
 
       <div className="mem-card stack">
-        <div className="row"><DateRangePicker value={range} onChange={setRange} /></div>
-
         <div className="mem-grid-4">
           <div>
             <div className="mem-caption">Doanh thu (Net)</div>
@@ -119,51 +124,30 @@ export default function Revenue() {
           <>
             <div className="table-wrap">
               <table className="tbl">
-                <thead><tr><th>Cửa hàng</th><th className="num">Số HĐ</th><th className="num">Gross</th><th className="num">Giảm giá</th><th className="num">Hoa hồng</th><th className="num">Net</th><th className="num">Net sau VAT</th><th className="num">Tỉ trọng</th></tr></thead>
+                <thead><tr><th>Cửa hàng</th><th className="num">Số HĐ</th><th className="num">Gross</th><th className="num">Giảm giá</th><th className="num">Hoa hồng</th><th className="num">Net</th><th className="num">Thuế VAT</th><th className="num">Net sau VAT</th><th className="num">Tỉ trọng</th></tr></thead>
                 <tbody>
                   {byStore.map((r) => (
                     <tr key={r.id}>
                       <td><b>{r.name}</b></td><td className="num">{num(r.orders)}</td><td className="num">{money(r.gross)}</td><td className="num">{money(r.discount)}</td>
-                      <td className="num">{money(r.commission)}</td><td className="num"><b>{money(r.net)}</b></td><td className="num">{money(r.net - r.vat)}</td><td className="num">{pct(t.net ? r.net / t.net : 0)}</td>
+                      <td className="num">{money(r.commission)}</td><td className="num"><b>{money(r.net)}</b></td><td className="num">{money(r.vat)}</td><td className="num">{money(r.net - r.vat)}</td><td className="num">{pct(t.net ? r.net / t.net : 0)}</td>
                     </tr>
                   ))}
                   {byStore.length > 1 && (
                     <tr className="total">
                       <td><b>Tổng</b></td><td className="num">{num(t.orders)}</td><td className="num">{money(t.gross)}</td><td className="num">{money(t.discount)}</td>
-                      <td className="num">{money(t.commission)}</td><td className="num"><b>{money(t.net)}</b></td><td className="num">{money(t.net - t.vat)}</td><td className="num">100%</td>
+                      <td className="num">{money(t.commission)}</td><td className="num"><b>{money(t.net)}</b></td><td className="num">{money(t.vat)}</td><td className="num">{money(t.net - t.vat)}</td><td className="num">100%</td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
-            <div className="row"><button className="mem-btn" onClick={() => setShowDays(!showDays)}>{showDays ? 'Ẩn chi tiết từng ngày' : 'Xem chi tiết từng ngày'}</button></div>
-            {showDays && (
-              <div className="table-wrap">
-                <table className="tbl">
-                  <thead><tr><th>Ngày</th>{!branchId && <th>Cửa hàng</th>}<th className="num">Số HĐ</th><th className="num">Net</th><th className="num">VAT</th><th className="num">Net sau VAT</th>{can('finance.import') && <th />}</tr></thead>
-                  <tbody>
-                    {rows.map((x) => (
-                      <tr key={`${x.branch_id}|${x.sale_date}`}>
-                        <td>{vnDate(x.sale_date)}</td>
-                        {!branchId && <td>{branchName.get(x.branch_id) ?? '—'}</td>}
-                        <td className="num">{num(x.orders)}</td>
-                        <td className="num"><b>{money(x.revenue)}</b></td>
-                        <td className="num">{money(x.vat ?? 0)}</td>
-                        <td className="num">{money(x.revenue - (x.vat ?? 0))}</td>
-                        {can('finance.import') && <td className="num"><button className="mem-btn mem-btn-sm mem-btn-danger" onClick={() => void removeDay(x.branch_id, x.sale_date)}>Xóa</button></td>}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
           </>
         ) : (
           <>
             <div className="row">
               <select className="input" style={{ width: 'auto' }} value={chanBranch} onChange={(e) => setChanBranch(e.target.value)} aria-label="Lọc theo cửa hàng">
                 <option value="">Tất cả cửa hàng</option>
-                {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                {branches.filter((b) => b.name.trim().toUpperCase() !== 'CÔNG TY').map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
               <span className="mem-caption">Từ báo cáo B03, cùng khoảng ngày đã chọn</span>
             </div>
@@ -186,6 +170,44 @@ export default function Revenue() {
           </>
         )}
       </div>
+
+      {tab === 'store' && rows.length > 0 && !sales.loading && (
+        <div className="mem-card stack">
+        <div className="spread">
+          <div className="section-title" style={{ margin: 0 }}>Chi tiết từng ngày</div>
+          <div className="row">
+            <select className="input" style={{ width: 'auto', minHeight: 38 }} value={dayBranch} onChange={(e) => setDayBranch(e.target.value)} aria-label="Lọc chi tiết theo cửa hàng">
+              <option value="">Tất cả cửa hàng</option>
+              {branches.filter((b) => b.name.trim().toUpperCase() !== 'CÔNG TY').map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+            <button className="mem-btn mem-btn-sm" onClick={() => setShowDays(!showDays)}>{showDays ? 'Ẩn' : 'Hiện'}</button>
+          </div>
+        </div>
+        {showDays && (
+          <div className="table-wrap">
+            <table className="tbl">
+              <thead><tr><th>Ngày</th>{!dayBranch && <th>Cửa hàng</th>}<th className="num">Số HĐ</th><th className="num">Gross</th><th className="num">Giảm giá</th><th className="num">Hoa hồng</th><th className="num">Net</th><th className="num">Thuế VAT</th><th className="num">Net sau VAT</th>{can('finance.import') && <th />}</tr></thead>
+              <tbody>
+                {dayRows.map((x) => (
+                  <tr key={`${x.branch_id}|${x.sale_date}`}>
+                    <td>{vnDate(x.sale_date)}</td>
+                    {!dayBranch && <td>{branchName.get(x.branch_id) ?? '—'}</td>}
+                    <td className="num">{num(x.orders)}</td>
+                    <td className="num">{money(x.gross ?? 0)}</td>
+                    <td className="num">{money((x.discount ?? 0) + (x.merchant_discount ?? 0) + (x.voucher ?? 0))}</td>
+                    <td className="num">{money(x.commission ?? 0)}</td>
+                    <td className="num"><b>{money(x.revenue)}</b></td>
+                    <td className="num">{money(x.vat ?? 0)}</td>
+                    <td className="num">{money(x.revenue - (x.vat ?? 0))}</td>
+                    {can('finance.import') && <td className="num"><button className="mem-btn mem-btn-sm mem-btn-danger" onClick={() => void removeDay(x.branch_id, x.sale_date)}>Xóa</button></td>}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        </div>
+      )}
 
       {importing && (
         <Modal title="Nhập file doanh thu" onClose={() => setImporting(false)} wide>

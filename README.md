@@ -21,7 +21,7 @@ Mở địa chỉ hiện ra (thường là http://localhost:5173).
 ## 2. Kết nối Supabase (dữ liệu thật)
 
 1. Vào https://supabase.com, tạo tài khoản và **New project** (chọn vùng Singapore cho nhanh).
-2. Vào **SQL Editor**, mở lần lượt từng file trong `supabase/migrations/` theo thứ tự số (`0001_core.sql`, `0002_finance.sql`, `0003_grants.sql`, `0004_fix_import_key.sql`, rồi `0005_payments.sql`, `0006_sales_vat.sql`, rồi `0007_sales_detail.sql`, rồi `0008_reconcile.sql`, `0009_store_reports.sql`), dán nội dung và bấm **Run**.
+2. Vào **SQL Editor**, mở lần lượt từng file trong `supabase/migrations/` theo thứ tự số (`0001_core.sql`, `0002_finance.sql`, `0003_grants.sql`, `0004_fix_import_key.sql`, rồi `0005_payments.sql`, `0006_sales_vat.sql`, rồi `0007_sales_detail.sql`, rồi `0008_reconcile.sql`, `0009_store_reports.sql`, `0010_payables.sql`), dán nội dung và bấm **Run**.
 3. Vào **Authentication → Providers → Email**: tắt **Allow new users to sign up** để người lạ không tự đăng ký.
 4. Vào **Authentication → Users → Add user**, tạo tài khoản đầu tiên của bạn. **Tài khoản đầu tiên tự thành Chủ.** Các tài khoản sau là Nhân viên, bạn vào mục Quản trị → Người dùng của web để gán vai trò và chi nhánh.
 5. Vào **Project Settings → API**, chép `Project URL` và khóa `anon public`.
@@ -83,7 +83,7 @@ src/modules/hr/         ← ví dụ Nhân sự: bảng hr_*, quyền hr.*
 
 Các bước thêm một hạng mục (ví dụ Kho):
 
-1. Tạo `supabase/migrations/0010_inventory.sql`: bảng `inv_*`, quyền `inventory.*`, luật RLS. **Không sửa các file migration cũ.**
+1. Tạo `supabase/migrations/0011_inventory.sql`: bảng `inv_*`, quyền `inventory.*`, luật RLS. **Không sửa các file migration cũ.**
 2. Tạo thư mục `src/modules/inventory/` và export một `AppModule` (xem `src/modules/finance/index.tsx`).
 3. Thêm 1 dòng vào `src/modules/registry.ts`.
 

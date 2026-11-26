@@ -1,6 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { useAuth } from '../../core/auth'
-import { DateRangePicker, useDateRange } from '../../core/DateRange'
+import type { Range } from '../../core/DateRange'
 import { today, vnDate } from '../../core/format'
 import { compressImage } from '../../core/image'
 import { Empty, ErrorBox, Loading, Modal, errText, useAsync, useToast } from '../../core/ui'
@@ -14,10 +14,9 @@ export const CHANNELS: { key: string; label: string }[] = [
 const chLabel = (k: string) => CHANNELS.find((c) => c.key === k)?.label ?? k
 
 /** Đánh giá khách trên các app giao đồ ăn và Google Maps: mỗi kênh một dòng mỗi ngày. */
-export default function AppReviews() {
+export default function AppReviews({ range }: { range: Range }) {
   const { branches: all, branchId } = useAuth()
   const branches = all.filter(isStore)
-  const [range, setRange] = useDateRange()
   const [writing, setWriting] = useState(false)
   const list = useAsync(() => listAppReviews(branchId, range.from, range.to), [branchId, range.from, range.to])
   const name = useMemo(() => new Map(branches.map((b) => [b.id, b.name])), [branches])
@@ -28,7 +27,7 @@ export default function AppReviews() {
   return (
     <div className="stack">
       <div className="spread">
-        <DateRangePicker value={range} onChange={setRange} />
+        <span />
         <button className="mem-btn mem-btn-primary" onClick={() => setWriting(true)} disabled={branches.length === 0}>Báo cáo đánh giá hôm nay</button>
       </div>
       {rows.length > 0 && (

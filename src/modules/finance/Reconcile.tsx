@@ -43,6 +43,7 @@ export default function Reconcile() {
   return (
     <div className="stack">
       <PageHead
+        controls={<DateRangePicker value={range} onChange={setRange} />}
         eyebrow="Tài chính"
         title="Đối soát"
         sub="Tiền phải về theo POS, so với số cửa hàng khai trên app và số thực nhận trên sao kê ngân hàng."
@@ -50,7 +51,6 @@ export default function Reconcile() {
       />
       <div className="mem-card stack">
         <div className="spread">
-          <DateRangePicker value={range} onChange={setRange} />
           <div className="seg" role="tablist" aria-label="Phần đối soát">
             {TABS.map(([k, label]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{label}</button>)}
           </div>

@@ -11,6 +11,10 @@ const STORE_PERMS = [
   { code: 'store.revenue', label: 'Số thực nhận' },
   { code: 'store.utility', label: 'Điện nước' },
 ]
+const PAYABLE_PERMS = [
+  { code: 'payable.view', label: 'Xem công nợ' },
+  { code: 'payable.edit', label: 'Nhập lệnh, đặt tên, đối chiếu' },
+]
 
 export default function Users() {
   const { branches, reloadBranches } = useAuth()
@@ -138,6 +142,17 @@ function UserForm({ user, onClose, onSaved }: { user: UserRow; onClose: () => vo
               })}
             </div>
             <span className="mem-caption">Chọn đúng những tab người này được dùng. Quản lý mặc định có đủ, bạn có thể bổ sung thêm cho Nhân viên (MOD). Chủ luôn có đủ.</span></div>
+
+        )}
+        {role !== 'owner' && (
+          <div className="field"><span className="lbl">Quyền mục “Công nợ NCC”</span>
+            <div className="chip-row">
+              {PAYABLE_PERMS.map((p) => {
+                const on = perms.includes(p.code)
+                return <button key={p.code} type="button" className={`chip ${on ? 'on' : ''}`} aria-pressed={on} onClick={() => setPerms(on ? perms.filter((x) => x !== p.code) : [...perms, p.code])}>{p.label}</button>
+              })}
+            </div>
+            <span className="mem-caption">Kế toán mặc định có đủ, Quản lý mặc định chỉ xem. Chủ luôn có đủ.</span></div>
         )}
         <label className="row" style={{ cursor: self ? 'not-allowed' : 'pointer' }}><input type="checkbox" checked={active} disabled={self} onChange={(e) => setActive(e.target.checked)} /> Cho phép đăng nhập</label>
         <div className="row" style={{ justifyContent: 'flex-end' }}>

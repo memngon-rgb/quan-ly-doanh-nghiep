@@ -1,3 +1,4 @@
+import { BranchSelect } from '../../core/BranchSelect'
 import { useEffect, useState } from 'react'
 import { useAuth } from '../../core/auth'
 import { money, monthLabel, monthRange, num, pct, shiftMonth, thisMonth, short } from '../../core/format'
@@ -51,12 +52,15 @@ export default function Forecast() {
         eyebrow="Tài chính"
         title="Dự tính chi phí"
         sub="Chi phí cố định lấy trung bình 3 tháng trước, giá vốn tính theo % doanh thu. Chỉnh được số liệu tay nếu cần."
-        right={
-          <div className="row">
-            <button className="mem-btn mem-btn-sm" onClick={() => setMonth(shiftMonth(month, -1))} aria-label="Tháng trước">‹</button>
-            <b>{monthLabel(month)}</b>
-            <button className="mem-btn mem-btn-sm" onClick={() => setMonth(shiftMonth(month, 1))} aria-label="Tháng sau">›</button>
-          </div>
+        controls={
+          <>
+            <div className="row">
+              <button className="mem-btn mem-btn-sm" onClick={() => setMonth(shiftMonth(month, -1))} aria-label="Tháng trước">‹</button>
+              <b>{monthLabel(month)}</b>
+              <button className="mem-btn mem-btn-sm" onClick={() => setMonth(shiftMonth(month, 1))} aria-label="Tháng sau">›</button>
+            </div>
+            <BranchSelect />
+          </>
         }
       />
 

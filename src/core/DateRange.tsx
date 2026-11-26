@@ -64,6 +64,7 @@ export function DateRangePicker({ value, onChange }: { value: Range; onChange: (
   const [two, setTwo] = useState(true)
   const [view, setView] = useState(value.from.slice(0, 7))
   const [pick, setPick] = useState<string | null>(null)
+  const [alignRight, setAlignRight] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -76,7 +77,12 @@ export function DateRangePicker({ value, onChange }: { value: Range; onChange: (
   }, [open])
 
   function toggle() {
-    if (!open) setView(value.from.slice(0, 7))
+    if (!open) {
+      setView(value.from.slice(0, 7))
+      // Nút nằm nửa bên phải màn hình thì mở lịch về phía trái để không bị cắt mất
+      const r = ref.current?.getBoundingClientRect()
+      setAlignRight(!!r && r.left + 640 > window.innerWidth)
+    }
     setOpen(!open)
     setPick(null)
   }
@@ -97,7 +103,7 @@ export function DateRangePicker({ value, onChange }: { value: Range; onChange: (
         <span>{vnDate(value.from)} - {vnDate(value.to)}</span>
       </button>
       {open && (
-        <div className="drp-pop" role="dialog" aria-label="Chọn khoảng ngày">
+        <div className={`drp-pop${alignRight ? ' right' : ''}`} role="dialog" aria-label="Chọn khoảng ngày">
           <div className="drp-side">
             <label className="drp-toggle"><input type="checkbox" checked={two} onChange={(e) => setTwo(e.target.checked)} /> Hiển thị 2 tháng</label>
             {PRESETS.map((p) => <button key={p.label} type="button" className="drp-preset" onClick={() => apply(p.get())}>{p.label}</button>)}

@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { BranchSelect } from '../../core/BranchSelect'
 import { DateRangePicker, useDateRange } from '../../core/DateRange'
 import { exportXlsx } from '../../core/excel'
 import { money, num, pct } from '../../core/format'
@@ -54,12 +55,8 @@ export default function PnL() {
         eyebrow="Tài chính"
         title="Báo cáo lãi lỗ (P&L)"
         sub="So sánh số thực tế với số dự tính, tính theo khoảng ngày đã chọn."
-        right={
-          <>
-            <DateRangePicker value={range} onChange={setRange} />
-            <button className="mem-btn" onClick={() => void exportFile()}><IconDownload /> Xuất Excel</button>
-          </>
-        }
+        controls={<><DateRangePicker value={range} onChange={setRange} /><BranchSelect /></>}
+        right={<button className="mem-btn" onClick={() => void exportFile()}><IconDownload /> Xuất Excel</button>}
       />
       <div className="mem-card stack">
         <div className="table-wrap">

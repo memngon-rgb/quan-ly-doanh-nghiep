@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useAuth } from '../../core/auth'
 import { DateRangePicker, useDateRange } from '../../core/DateRange'
 import { addDays, money, monthRange, pct, short, today, vnDate } from '../../core/format'
+import { BranchSelect } from '../../core/BranchSelect'
 import { ErrorBox, Loading, PageHead } from '../../core/ui'
 import { IconTrend, IconWallet, IconChart } from '../../core/icons'
 import { rangePlan, simulate, summarize } from './calc'
@@ -54,7 +55,7 @@ export default function Dashboard() {
 
   return (
     <div className="stack">
-      <PageHead eyebrow={range.from === range.to ? vnDate(range.from) : `${vnDate(range.from)} - ${vnDate(range.to)}`} title="Tổng quan tài chính" right={<DateRangePicker value={range} onChange={setRange} />} />
+      <PageHead title="Tổng quan tài chính" controls={<><DateRangePicker value={range} onChange={setRange} /><BranchSelect /></>} />
 
       <div className="hero">
         <div>

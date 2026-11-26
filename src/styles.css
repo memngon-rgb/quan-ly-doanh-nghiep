@@ -180,14 +180,60 @@ table.tbl { width:100%; border-collapse:collapse; font-size:13px; }
 .drp-grid { display:grid; grid-template-columns:repeat(7, 36px); row-gap:3px; justify-items:center; }
 .drp-dow { font-size:11px; font-weight:800; color:var(--mem-muted); padding:4px 0; }
 .drp-day { width:34px; height:34px; border:0; border-radius:50%; background:none; color:var(--mem-ink); font-size:13px; cursor:pointer; }
+.drp-pop.right { left:auto; right:0; }
 .drp-day:hover { background:#eaf0ea; }
 .drp-day.in { background:var(--mem-green-soft); color:var(--mem-green); }
 .drp-day.edge { background:var(--mem-green); color:#fff; font-weight:800; }
 .drp-day.today:not(.edge) { box-shadow:inset 0 0 0 1.5px var(--mem-green-2); }
 @media (max-width:760px) {
-  .drp-pop { flex-direction:column; left:0; right:auto; }
+  .drp-pop { flex-direction:column; }
   .drp-side { flex-direction:row; flex-wrap:wrap; border-right:0; border-bottom:1px solid var(--mem-line); padding:0 0 12px; min-width:0; }
   .drp-toggle { display:none; }
   .drp-months { flex-direction:column; gap:12px; }
   .drp-months .drp-month:nth-child(2) { display:none; }
 }
+
+/* Số thực nhận: nhóm theo ngày */
+.day-card { background:var(--mem-surface); border:1px solid var(--mem-line); border-radius:14px; overflow:hidden; }
+.day-head { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; padding:12px 16px; background:#f6f8f5; border-bottom:1px solid var(--mem-line); }
+.day-sum { display:flex; gap:16px; align-items:center; flex-wrap:wrap; font-size:13px; color:var(--mem-muted); }
+.day-sum b { color:var(--mem-ink); }
+.day-row { padding:10px 16px; border-bottom:1px solid #f0f3ef; }
+.day-row:last-child { border-bottom:0; }
+.day-row.bad { background:#fff7f5; }
+.day-main { display:grid; grid-template-columns: minmax(110px,1.1fr) 1.2fr 1.2fr 110px auto; gap:10px; align-items:center; }
+.day-src { font-weight:800; }
+.day-n { text-align:right; font-variant-numeric:tabular-nums; }
+.day-diff { font-weight:800; font-size:13px; color:#3b9260; }
+.day-diff.neg { color:var(--mem-danger); }
+.day-diff.pos { color:#af863b; }
+.day-act { display:flex; gap:6px; justify-content:flex-end; }
+.day-note { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:6px; font-size:13px; }
+@media (max-width:800px) {
+  .day-main { grid-template-columns: 1fr 1fr; gap:4px 10px; }
+  .day-src { order:1; }
+  .day-diff { order:2; text-align:right; }
+  .day-n { order:3; text-align:left; }
+  .day-n:nth-of-type(3) { order:4; text-align:right; }
+  .day-act { order:5; grid-column:1 / -1; justify-content:flex-start; margin-top:4px; }
+  .day-row { padding:10px 12px; }
+}
+.day-toggle { width:100%; border:0; border-bottom:1px solid var(--mem-line); text-align:left; cursor:pointer; font:inherit; color:inherit; }
+.day-toggle:hover { background:#eef3ee; }
+
+/* Bảng ngày x nguồn */
+.mx td, .mx th { white-space:nowrap; }
+.mx-day { position:sticky; left:0; background:var(--mem-surface); }
+.mx-bad td { background:#fff9f7; } .mx-bad .mx-day { background:#fff9f7; }
+.mx-cell { border:1px solid transparent; background:none; font:inherit; font-variant-numeric:tabular-nums; cursor:pointer; border-radius:8px; padding:4px 8px; text-align:right; color:var(--mem-ink); display:inline-flex; flex-direction:column; align-items:flex-end; line-height:1.25; }
+.mx-cell:hover { border-color:var(--mem-line); background:#f3f6f2; }
+.mx-cell.on { border-color:var(--mem-green); background:var(--mem-green-soft); }
+.mx-cell.neg { color:var(--mem-danger); background:#fff0ec; font-weight:800; }
+.mx-cell.over { color:#af863b; background:#fff5e5; }
+.mx-cell small { font-size:10.5px; font-weight:800; }
+.mx-cell i { font-style:normal; font-size:9px; color:var(--mem-muted); }
+.mx-cell small.ok { color:#3b9260; }
+
+/* Nút thao tác ở đầu trang: nhỏ gọn, nằm cùng hàng với bộ lọc */
+.head-actions .mem-btn { padding:9px 12px; font-size:12px; border-radius:9px; }
+.head-actions .mem-btn svg { width:14px; height:14px; }

@@ -81,7 +81,7 @@ export default function ImportPanel({ mode, onDone }: { mode: 'tx' | 'revenue'; 
   const [hasHeader, setHasHeader] = useState(true)
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState('')
-  const [col, setCol] = useState({ date: -1, amount: -1, type: -1, cat: -1, note: -1, orders: -1, debit: -1, credit: -1, store: -1 })
+  const [col, setCol] = useState({ date: -1, amount: -1, type: -1, cat: -1, note: -1, orders: -1, debit: -1, credit: -1, store: -1, acct: -1, acctName: -1 })
   const [typeMode, setTypeMode] = useState<TypeMode>('expense')
   const [defCat, setDefCat] = useState('')
   const [stores, setStores] = useState<IposStore[] | null>(null)
@@ -188,6 +188,8 @@ export default function ImportPanel({ mode, onDone }: { mode: 'tx' | 'revenue'; 
       orders: guess(h, ['so hoa don', 'so don', 'orders']),
       debit, credit,
       store: guess(h, ['cua hang', 'chi nhanh', 'store']),
+      acct: guess(h, ['so tai khoan doi ung', 'corresponsive account']),
+      acctName: guess(h, ['ten tai khoan doi ung', 'corresponsive name']),
     })
     if (kind === 'tx') {
       if (debit >= 0 && credit >= 0) { setTypeMode('split'); setTxMethod('transfer') }
@@ -243,9 +245,13 @@ export default function ImportPanel({ mode, onDone }: { mode: 'tx' | 'revenue'; 
       const base = `${date}|${type}|${amount}|${norm(note)}`
       const n = (seen.get(`${rowBr}|${base}`) ?? 0) + 1
       seen.set(`${rowBr}|${base}`, n)
+      const acct = col.acct >= 0 ? String(row[col.acct] ?? '').trim() : ''
+      const acctName = col.acctName >= 0 ? String(row[col.acctName] ?? '').trim() : ''
       tx.push({
         branch_id: rowBr, tx_date: date, type, category_id, amount, method: txMethod, note, receipt_path: null,
         source: 'import', external_key: `${base}|${n}`,
+        // Chỉ gửi khi file có cột này (cần chạy SQL 0010 trước)
+        ...(acct ? { counterparty_account: acct, counterparty_name: acctName } : {}),
       })
     }
     return { tx, sales: [...salesMap.values()], skipped, noBranch }
@@ -541,6 +547,8 @@ export default function ImportPanel({ mode, onDone }: { mode: 'tx' | 'revenue'; 
               </>
             ) : colSelect('amount', kind === 'sales' ? 'Cột Doanh thu' : 'Cột Số tiền', true)}
             {kind === 'tx' && colSelect('store', 'Cột Cửa hàng (nếu một file có nhiều cửa hàng)')}
+            {kind === 'tx' && colSelect('acct', 'Cột Số tài khoản đối ứng (sao kê ngân hàng, để theo dõi nhà cung cấp)')}
+            {kind === 'tx' && col.acct >= 0 && colSelect('acctName', 'Cột Tên tài khoản đối ứng')}
             {kind === 'tx' && (
               <div className="field"><label htmlFor="tx-method">Hình thức thanh toán</label>
                 <select id="tx-method" className="input" value={txMethod} onChange={(e) => setTxMethod(e.target.value as Method)}>
